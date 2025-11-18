@@ -1,65 +1,68 @@
 <!DOCTYPE html>
 <html lang="vi">
-
-<head>
+  <head>
     <meta charset="UTF-8" />
     <title>Giám sát chất lượng không khí</title>
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-</head>
+  </head>
 
-<body>
+  <body>
+  </head>
+  <body>
     <header>
-        <h1>🌤️ Hệ thống giám sát chất lượng không khí Hà Nội</h1>
+      <h1>🌤️ Hệ thống giám sát chất lượng không khí Hà Nội</h1>
     </header>
 
+    <!-- Nút ẩn/hiện sidebar -->
+    <button id="toggle-sidebar">☰</button>
+
     <div id="container">
-        <aside id="sidebar">
-            <h2>📍 Danh sách trạm đo</h2>
-            <ul id="station-list">
-                <!-- Trạng thái loading -->
-                <li>Đang tải dữ liệu trạm...</li>
-            </ul>
-
-            <h3>🌈 Thang màu AQI</h3>
-            <table class="legend">
-                <tr>
-                    <td style="background:#00e400"></td>
-                    <td>Tốt (0–50)</td>
-                </tr>
-                <tr>
-                    <td style="background:#ffff00"></td>
-                    <td>Trung bình (51–100)</td>
-                </tr>
-                <tr>
-                    <td style="background:#ff7e00"></td>
-                    <td>Kém (101–150)</td>
-                </tr>
-                <tr>
-                    <td style="background:#ff0000"></td>
-                    <td>Xấu (151–200)</td>
-                </tr>
-                <tr>
-                    <td style="background:#8f3f97"></td>
-                    <td>Rất xấu (201–300)</td>
-                </tr>
-                <tr>
-                    <td style="background:#7e0023"></td>
-                    <td>Nguy hiểm (301+)</td>
-                </tr>
-            </table>
-        </aside>
-
-        <main id="map"></main>
+      <aside id="sidebar">
+        <h2>📍 Danh sách trạm đo</h2>
+        <ul id="station-list">
+          <li>Đang tải dữ liệu trạm...</li>
+        </ul>
+        <h3>🌈 Thang màu AQI</h3>
+        <table class="legend">
+          <tr>
+            <td style="background: #00e400"></td>
+            <td>Tốt (0–50)</td>
+          </tr>
+          <tr>
+            <td style="background: #ffff00"></td>
+            <td>Trung bình (51–100)</td>
+          </tr>
+          <tr>
+            <td style="background: #ff7e00"></td>
+            <td>Kém (101–150)</td>
+          </tr>
+          <tr>
+            <td style="background: #ff0000"></td>
+            <td>Xấu (151–200)</td>
+          </tr>
+          <tr>
+            <td style="background: #8f3f97"></td>
+            <td>Rất xấu (201–300)</td>
+          </tr>
+          <tr>
+            <td style="background: #7e0023"></td>
+            <td>Nguy hiểm (301+)</td>
+          </tr>
+        </table>
+      </aside>
+      <main id="map"></main>
     </div>
 
     <footer>
-        <p>Nguồn dữ liệu: <a href="https://aqicn.org/" target="_blank">AQICN API</a></p>
+      <p>
+        Nguồn dữ liệu:
+        <a href="https://aqicn.org/" target="_blank">AQICN API</a>
+      </p>
     </footer>
 
     <!-- Quan trọng: Dùng 'defer' để script chạy sau khi HTML được load -->
     <script src="script.js" defer></script>
-</body>
-
+  </body>
 </html>
