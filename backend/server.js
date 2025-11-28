@@ -14,20 +14,23 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "../frontend")));
 
-// === API ===
+// API STATIONS
 app.get("/api/stations", async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT name, aqi, pm25, pm10, o3, no2, so2, co, lat, lon 
-      FROM stations WHERE lat IS NOT NULL ORDER BY name
+      FROM stations 
+      WHERE lat IS NOT NULL 
+      ORDER BY name
     `);
     res.json(rows);
   } catch (err) {
-    console.error("Lỗi stations:", err.message);
-    res.status(500).json({ error: "Lỗi server" });
+    console.error("Lỗi /api/stations:", err.message); // THÊM err.message để log đầy đủ
+    res.status(500).json({ error: "DB error" });
   }
 });
 
+// API HISTORY
 app.get("/api/history", async (req, res) => {
   const { name } = req.query;
   if (!name) return res.status(400).json({ error: "Thiếu tên trạm" });
@@ -36,13 +39,15 @@ app.get("/api/history", async (req, res) => {
     const { rows } = await pool.query(
       `
       SELECT recorded_at, aqi, pm25, pm10, o3, no2, so2, co
-      FROM station_history WHERE station_name = $1
-      ORDER BY recorded_at DESC LIMIT 48
+      FROM station_history 
+      WHERE station_name = $1 
+      ORDER BY recorded_at DESC 
+      LIMIT 48
     `,
       [name]
     );
 
-    if (rows.length === 0)
+    if (rows.length === 0) {
       return res.json({
         times: [],
         pm25: [],
@@ -53,6 +58,7 @@ app.get("/api/history", async (req, res) => {
         co: [],
         recorded_at: [],
       });
+    }
 
     const reversed = rows.reverse();
     const times = reversed.map((r) => {
@@ -75,8 +81,8 @@ app.get("/api/history", async (req, res) => {
       recorded_at: reversed.map((r) => r.recorded_at),
     });
   } catch (err) {
-    console.error("Lỗi history:", err.message);
-    res.status(500).json({ error: "Lỗi server" });
+    console.error("Lỗi /api/history:", err.message); // THÊM err.message
+    res.status(500).json({ error: "DB error" });
   }
 });
 
@@ -84,14 +90,12 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/index.html"));
 });
 
-// === KHỞI ĐỘNG ===
 const PORT = process.env.PORT || 10000;
-
 app.listen(PORT, async () => {
   console.log(`Server chạy trên cổng ${PORT}`);
 
-  // 1. TẠO BẢNG TRƯỚC TIÊN (bắt buộc phải chờ xong)
   try {
+    // TẠO BẢNG – SPLIT THÀNH 2 QUERY RIÊNG ĐỂ AN TOÀN
     await pool.query(`
       CREATE TABLE IF NOT EXISTS stations (
         id SERIAL PRIMARY KEY,
@@ -102,7 +106,9 @@ app.listen(PORT, async () => {
         lon DOUBLE PRECISION,
         last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
 
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS station_history (
         id SERIAL PRIMARY KEY,
         station_name VARCHAR(255) NOT NULL,
@@ -111,28 +117,30 @@ app.listen(PORT, async () => {
         recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log("Bảng đã được tạo thành công!");
+    console.log("Bảng đã sẵn sàng!");
   } catch (err) {
-    console.error("KHÔNG THỂ TẠO BẢNG:", err.message);
+    console.error("LỖI TẠO BẢNG CHI TIẾT:", err.message); // THÊM err.message để thấy lỗi cụ thể
     process.exit(1);
   }
 
-  // 2. SAU KHI BẢNG ĐÃ TỒN TẠI → MỚI ĐƯỢC GỌI updateAQIData()
+  // LẤY DỮ LIỆU LẦN ĐẦU
   try {
     const { rows } = await pool.query("SELECT COUNT(*) FROM stations");
     if (parseInt(rows[0].count) === 0) {
-      console.log("Bảng trống → đang lấy dữ liệu AQI lần đầu...");
-      await updateAQIData(); // BÂY GIỜ MỚI CHẠY!
+      console.log("Bảng trống → lấy dữ liệu AQI...");
+      await updateAQIData();
     }
   } catch (err) {
-    console.error("Lỗi kiểm tra bảng:", err.message);
+    console.error("Lỗi kiểm tra bảng:", err.message); // THÊM log
   }
 
-  // 3. Cập nhật định kỳ
+  // CẬP NHẬT MỖI GIỜ
   cron.schedule("0 * * * *", () => {
-    console.log("Cập nhật AQI định kỳ (mỗi giờ)...");
-    updateAQIData().catch(() => {});
+    console.log("Cập nhật AQI định kỳ...");
+    updateAQIData().catch((err) =>
+      console.error("Lỗi cập nhật định kỳ:", err.message)
+    );
   });
 
-  console.log("HỆ THỐNG AQI HÀ NỘI ĐÃ HOÀN TẤT – TRUY CẬP NGAY!");
+  console.log("HỆ THỐNG ĐÃ HOÀN TẤT – TRUY CẬP WEB NGAY!");
 });
