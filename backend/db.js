@@ -27,8 +27,17 @@ import { Pool } from "pg";
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false,
+    rejectUnauthorized: false, // Cho phép kết nối SSL mà không cần xác thực chứng chỉ
   },
+});
+
+// Optional: log khi kết nối thành công (rất hữu ích)
+pool.on("connect", () => {
+  console.log("Đã kết nối thành công tới PostgreSQL trên Render!");
+});
+
+pool.on("error", (err) => {
+  console.error("Lỗi kết nối database:", err.message);
 });
 
 export { pool };
