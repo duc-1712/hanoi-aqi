@@ -7,7 +7,19 @@ import { fileURLToPath } from "url";
 import { pool } from "./db.js";
 import { updateAQIData } from "./fetch_aqi.js";
 
-// === Khởi tạo bảng tự động ===
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Middleware
+app.use(cors({ origin: "*" }));
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "../frontend")));
+
+// ==================== TỰ ĐỘNG TẠO BẢNG KHI KHỞI ĐỘNG ====================
 async function initializeDatabase() {
   const createStations = `
     CREATE TABLE IF NOT EXISTS stations (
@@ -62,45 +74,31 @@ async function initializeDatabase() {
   `;
 
   try {
-    console.log("Kiểm tra và tạo các bảng nếu chưa tồn tại...");
+    console.log("Đang kiểm tra và tạo các bảng...");
     await pool.query(createStations);
     await pool.query(createHistory);
-    await pool.query(createArchive);
     await pool.query(createIndexes);
+    await pool.query(createArchive);
     console.log("Tất cả bảng đã sẵn sàng!");
   } catch (err) {
-    console.error("Lỗi nghiêm trọng khi tạo bảng:", err.message);
-    throw err; // Dừng luôn nếu không tạo được bảng
+    console.error("Lỗi tạo bảng:", err.message);
+    throw err;
   }
 }
 
-// === Cấu hình đường dẫn ===
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
-
-const app = express();
-const PORT = process.env.PORT || 5000;
-
-// Middleware
-app.use(cors({ origin: "*" }));
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "../frontend")));
-
 // ==================== API ROUTES ====================
-
 app.get("/api/stations", async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT name, aqi, pm25, pm10, o3, no2, so2, co, lat, lon, last_update 
       FROM stations 
-      WHERE aqi IS NOT NULL AND lat IS NOT NULL AND lon IS NOT NULL
+      WHERE lat IS NOT NULL AND lon IS NOT NULL
       ORDER BY name
     `);
-    res.json(rows.length > 0 ? rows : []);
+    res.json(rows);
   } catch (err) {
-    console.error("Lỗi lấy danh sách trạm:", err.message);
-    res.status(500).json({ error: "Lỗi máy chủ nội bộ" });
+    console.error("Lỗi /api/stations:", err.message);
+    res.status(500).json({ error: "Lỗi server" });
   }
 });
 
@@ -127,6 +125,7 @@ app.get("/api/history", async (req, res) => {
         no2: [],
         so2: [],
         co: [],
+        aqi: [],
       });
     }
 
@@ -148,38 +147,35 @@ app.get("/api/history", async (req, res) => {
       no2: reversed.map((r) => r.no2),
       so2: reversed.map((r) => r.so2),
       co: reversed.map((r) => r.co),
+      recorded_at: reversed.map((r) => r.recorded_at), // ← quan trọng cho frontend hiển thị ngày
     });
   } catch (err) {
-    console.error("Lỗi lấy lịch sử:", err.message);
+    console.error("Lỗi /api/history:", err.message);
     res.status(500).json({ error: "Lỗi server" });
   }
 });
 
 app.get("/api/hanoi-archive", async (req, res) => {
   try {
-    const archive = await pool.query(
+    const { rows } = await pool.query(
       `SELECT record_date, pm25 FROM hanoi_archive ORDER BY record_date ASC`
     );
-    const todayAvg = await pool.query(
-      `SELECT AVG(pm25)::INTEGER as avg_pm25 FROM stations WHERE pm25 IS NOT NULL`
+    const { rows: today } = await pool.query(
+      `SELECT AVG(pm25)::INTEGER as avg FROM stations WHERE pm25 IS NOT NULL`
     );
 
-    const data = archive.rows.map((row) => ({
-      date: new Date(row.record_date).toLocaleDateString("vi-VN"),
-      pm25: row.pm25 ? Math.round(row.pm25) : null,
+    const data = rows.map((r) => ({
+      date: new Date(r.record_date).toLocaleDateString("vi-VN"),
+      pm25: r.pm25 ? Math.round(r.pm25) : null,
     }));
 
-    if (todayAvg.rows[0].avg_pm25) {
-      data.push({
-        date: "Hôm nay",
-        pm25: Math.round(todayAvg.rows[0].avg_pm25),
-      });
-    }
+    if (today[0]?.avg)
+      data.push({ date: "Hôm nay", pm25: Math.round(today[0].avg) });
 
     res.json(data);
   } catch (err) {
-    console.error("Lỗi lấy dữ liệu archive:", err.message);
-    res.status(500).json({ error: "Lỗi lấy dữ liệu lưu trữ" });
+    console.error("Lỗi archive:", err.message);
+    res.status(500).json({ error: "Lỗi server" });
   }
 });
 
@@ -190,53 +186,39 @@ app.get("*", (req, res) => {
 
 // ==================== KHỞI ĐỘNG SERVER ====================
 app.listen(PORT, async () => {
-  console.log(`\nServer đang chạy tại http://localhost:${PORT}`);
+  console.log(`\nServer chạy tại http://localhost:${PORT}`);
 
   try {
-    // BƯỚC 1: Tạo bảng trước tiên (quan trọng nhất!)
     await initializeDatabase();
 
-    // BƯỚC 2: Kiểm tra dữ liệu stations
     const { rows } = await pool.query("SELECT COUNT(*) FROM stations");
     const count = parseInt(rows[0].count, 10);
 
     if (count === 0) {
-      console.log("Bảng stations trống → Lấy dữ liệu lần đầu...");
+      console.log("Bảng trống → Lấy dữ liệu lần đầu...");
       await updateAQIData();
     } else {
-      const recent = await pool.query(
+      const { rows: last } = await pool.query(
         `SELECT last_update FROM stations ORDER BY last_update DESC LIMIT 1`
       );
-      const lastUpdate = recent.rows[0]?.last_update;
-      const minutesAgo = lastUpdate
-        ? Math.floor((Date.now() - new Date(lastUpdate)) / 60000)
+      const minutesAgo = last[0]
+        ? Math.floor((Date.now() - new Date(last[0].last_update)) / 60000)
         : 999;
-
       console.log(
-        `Đã có ${count} trạm, cập nhật lần cuối: ${minutesAgo} phút trước`
+        `Đã cóetted ${count} trạm, cập nhật ${minutesAgo} phút trước`
       );
-
-      if (minutesAgo > 30) {
-        console.log("Dữ liệu cũ → Cập nhật ngay...");
-        await updateAQIData();
-      }
+      if (minutesAgo > 30) await updateAQIData();
     }
   } catch (err) {
-    console.error("Lỗi khởi động nghiêm trọng:", err.message);
-    console.log("Vẫn cố gắng cập nhật dữ liệu (có thể tự phục hồi lần sau)...");
+    console.error("Khởi động lỗi:", err.message);
     updateAQIData().catch(() => {});
   }
 
-  // Cập nhật tự động mỗi 15 phút
-  cron.schedule("*/15 * * * *", () => {
-    console.log("Đang cập nhật dữ liệu AQI định kỳ (15 phút/lần)...");
+  // Cập nhật mỗi 1 tiếng (vào phút 00)
+  cron.schedule("0 * * * *", () => {
+    console.log("Cập nhật định kỳ mỗi giờ...");
     updateAQIData();
   });
-  //   // Cập nhật mỗi 2 tiếng (vào phút 00 của giờ chẵn)
-  // cron.schedule("0 */2 * * *", () => {
-  //   console.log("Đang cập nhật dữ liệu AQI định kỳ (mỗi 2 tiếng/lần)...");
-  //   updateAQIData();
-  // });
 
-  console.log("Hệ thống giám sát không khí Hà Nội đã HOÀN TOÀN sẵn sàng!\n");
+  console.log("Hệ thống giám sát không khí Hà Nội đã sẵn sàng 100%!\n");
 });

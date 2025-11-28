@@ -188,7 +188,6 @@ async function selectStation(st) {
   document.getElementById("selected-station-name").innerText = st.name;
   document.getElementById("current-stats").classList.remove("hidden");
 
-  // Cập nhật chỉ số hiện tại
   document.getElementById("val-aqi").innerText = st.aqi || "--";
   document.getElementById("val-aqi").style.color = getAQIColor(st.aqi);
   document.getElementById("val-pm25").innerText = st.pm25 ?? "--";
@@ -199,26 +198,16 @@ async function selectStation(st) {
 
   map.flyTo([st.lat, st.lon], 14);
 
-  // Lấy lịch sử
   try {
     const res = await fetch(
       `${HISTORY_API_URL}?name=${encodeURIComponent(st.name)}`
     );
     const data = await res.json();
 
-    if (!data.times || data.times.length === 0) {
-      document.getElementById("charts-wrapper").innerHTML =
-        "<p style='text-align:center;color:#999'>Chưa có dữ liệu lịch sử</p>";
-      return;
-    }
+    if (!data.times || data.times.length === 0) return;
 
-    // Lấy mảng full timestamp từ backend (recorded_at)
-    const rows = await (
-      await fetch(`${HISTORY_API_URL}?name=${encodeURIComponent(st.name)}`)
-    ).json();
-    const fullTimestamps = rows.map((r) => r.recorded_at); // Đây là mảng timestamp đầy đủ
+    const fullTimestamps = data.recorded_at || [];
 
-    // Vẽ tất cả biểu đồ với khả năng hiển thị ngày tháng
     renderChart(
       "chart-pm25",
       "PM2.5 (Bụi mịn)",
@@ -237,7 +226,7 @@ async function selectStation(st) {
     );
     renderChart(
       "chart-no2",
-      "NO₂ (Nitơ Đioxit)",
+      "NO₂",
       "#f59e0b",
       data.times,
       data.no2,
@@ -245,7 +234,7 @@ async function selectStation(st) {
     );
     renderChart(
       "chart-co",
-      "CO (Cacbon Monoxit)",
+      "CO",
       "#ef4444",
       data.times,
       data.co,
@@ -253,7 +242,7 @@ async function selectStation(st) {
     );
     renderChart(
       "chart-o3",
-      "O₃ (Ozone)",
+      "O₃",
       "#8b5cf6",
       data.times,
       data.o3,
@@ -261,7 +250,7 @@ async function selectStation(st) {
     );
     renderChart(
       "chart-so2",
-      "SO₂ (Lưu huỳnh Đioxit)",
+      "SO₂",
       "#6366f1",
       data.times,
       data.so2,
@@ -274,7 +263,7 @@ async function selectStation(st) {
 
 // Khởi động
 loadStations();
-setInterval(loadStations, 5 * 60 * 1000); // Cập nhật danh sách trạm mỗi 5 phút
+setInterval(loadStations, 5 * 60 * 1000);
 
 // Toggle Sidebar
 document.getElementById("toggle-sidebar").addEventListener("click", () => {
