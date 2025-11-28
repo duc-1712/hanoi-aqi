@@ -62,12 +62,13 @@ app.get("/api/history", async (req, res) => {
     }
 
     const reversed = rows.reverse();
-    const times = reversed.map((r) => {
+    const times = rev.map((r) => {
       const d = new Date(r.recorded_at);
-      return `${d.getHours().toString().padStart(2, "0")}:${d
-        .getMinutes()
-        .toString()
-        .padStart(2, "0")}`;
+      const day = d.getDate().toString().padStart(2, "0");
+      const month = (d.getMonth() + 1).toString().padStart(2, "0");
+      const hour = d.getHours().toString().padStart(2, "0");
+      const minute = d.getMinutes().toString().padStart(2, "0");
+      return `${day}/${month} ${hour}:${minute}`; // Ví dụ: "28/11 13:11"
     });
 
     res.json({
