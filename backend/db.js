@@ -21,18 +21,19 @@
 // });
 
 // db.js – CHẠY render
-// db.js
+
 import { Pool } from "pg";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false,
+    require: true, // Force SSL
+    rejectUnauthorized: false, // Ignore cert errors (Render self-signed)
   },
 });
 
-// Log để biết chắc chắn kết nối thành công
-pool.on("connect", () => console.log("Kết nối PostgreSQL thành công!"));
-pool.on("error", (err) => console.error("Lỗi DB:", err.message));
+// Log chi tiết để debug
+pool.on("connect", () => console.log("✅ Kết nối PostgreSQL thành công!"));
+pool.on("error", (err) => console.error("❌ Lỗi DB:", err.message));
 
 export { pool };
