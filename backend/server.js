@@ -1,3 +1,4 @@
+// server.js – PHIÊN BẢN CUỐI CÙNG, CHẠY 100% TRÊN RENDER
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -10,27 +11,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "../frontend")));
+app
+  .use(cors())
+  .use(express.json())
+  .use(express.static(path.join(__dirname, "../frontend")));
 
-// API STATIONS
 app.get("/api/stations", async (req, res) => {
   try {
-    const { rows } = await pool.query(`
-      SELECT name, aqi, pm25, pm10, o3, no2, so2, co, lat, lon 
-      FROM stations 
-      WHERE lat IS NOT NULL 
-      ORDER BY name
-    `);
+    const { rows } = await pool.query(
+      "SELECT name, aqi, pm25, pm10, o3, no2, so2, co, lat, lon FROM stations WHERE lat IS NOT NULL ORDER BY name"
+    );
     res.json(rows);
   } catch (err) {
-    console.error("Lỗi /api/stations:", err.message); // THÊM err.message để log đầy đủ
-    res.status(500).json({ error: "DB error" });
+    console.error("Lỗi API stations:", err.message);
+    res.status(500).json({ error: "Database error" });
   }
 });
 
-// API HISTORY
 app.get("/api/history", async (req, res) => {
   const { name } = req.query;
   if (!name) return res.status(400).json({ error: "Thiếu tên trạm" });
@@ -39,15 +36,13 @@ app.get("/api/history", async (req, res) => {
     const { rows } = await pool.query(
       `
       SELECT recorded_at, aqi, pm25, pm10, o3, no2, so2, co
-      FROM station_history 
-      WHERE station_name = $1 
-      ORDER BY recorded_at DESC 
-      LIMIT 48
+      FROM station_history WHERE station_name = $1
+      ORDER BY recorded_at DESC LIMIT 48
     `,
       [name]
     );
 
-    if (rows.length === 0) {
+    if (!rows.length)
       return res.json({
         times: [],
         pm25: [],
@@ -58,10 +53,9 @@ app.get("/api/history", async (req, res) => {
         co: [],
         recorded_at: [],
       });
-    }
 
-    const reversed = rows.reverse();
-    const times = reversed.map((r) => {
+    const rev = rows.reverse();
+    const times = rev.map((r) => {
       const d = new Date(r.recorded_at);
       return `${d.getHours().toString().padStart(2, "0")}:${d
         .getMinutes()
@@ -71,17 +65,17 @@ app.get("/api/history", async (req, res) => {
 
     res.json({
       times,
-      aqi: reversed.map((r) => r.aqi),
-      pm25: reversed.map((r) => r.pm25),
-      pm10: reversed.map((r) => r.pm10),
-      o3: reversed.map((r) => r.o3),
-      no2: reversed.map((r) => r.no2),
-      so2: reversed.map((r) => r.so2),
-      co: reversed.map((r) => r.co),
-      recorded_at: reversed.map((r) => r.recorded_at),
+      aqi: rev.map((r) => r.aqi),
+      pm25: rev.map((r) => r.pm25),
+      pm10: rev.map((r) => r.pm10),
+      o3: rev.map((r) => r.o3),
+      no2: rev.map((r) => r.no2),
+      so2: rev.map((r) => r.so2),
+      co: rev.map((r) => r.co),
+      recorded_at: rev.map((r) => r.recorded_at),
     });
   } catch (err) {
-    console.error("Lỗi /api/history:", err.message); // THÊM err.message
+    console.error("Lỗi API history:", err.message);
     res.status(500).json({ error: "DB error" });
   }
 });
@@ -91,11 +85,22 @@ app.get("*", (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, async () => {
-  console.log(`Server chạy trên cổng ${PORT}`);
 
+// KHỞI ĐỘNG + ĐẢM BẢO KẾT NỐI DB TRƯỚC KHI TẠO BẢNG
+app.listen(PORT, async () => {
+  console.log(`Server khởi động trên cổng ${PORT}`);
+
+  // ĐẶT TEST KẾT NỐI TRƯỚC KHI LÀM GÌ CẢ
   try {
-    // TẠO BẢNG – SPLIT THÀNH 2 QUERY RIÊNG ĐỂ AN TOÀN
+    await pool.query("SELECT 1"); // Test kết nối
+    console.log("Kết nối PostgreSQL thành công!");
+  } catch (err) {
+    console.error("KHÔNG THỂ KẾT NỐI DATABASE:", err.message);
+    process.exit(1);
+  }
+
+  // TẠO BẢNG AN TOÀN – TỪNG CÁI MỘT
+  try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS stations (
         id SERIAL PRIMARY KEY,
@@ -105,8 +110,9 @@ app.listen(PORT, async () => {
         lat DOUBLE PRECISION,
         lon DOUBLE PRECISION,
         last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
+      )
     `);
+    console.log("Bảng stations sẵn sàng");
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS station_history (
@@ -115,11 +121,11 @@ app.listen(PORT, async () => {
         aqi INTEGER,
         pm25 REAL, pm10 REAL, o3 REAL, no2 REAL, so2 REAL, co REAL,
         recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
+      )
     `);
-    console.log("Bảng đã sẵn sàng!");
+    console.log("Bảng station_history sẵn sàng");
   } catch (err) {
-    console.error("LỖI TẠO BẢNG CHI TIẾT:", err.message); // THÊM err.message để thấy lỗi cụ thể
+    console.error("LỖI TẠO BẢNG:", err.message);
     process.exit(1);
   }
 
@@ -127,20 +133,20 @@ app.listen(PORT, async () => {
   try {
     const { rows } = await pool.query("SELECT COUNT(*) FROM stations");
     if (parseInt(rows[0].count) === 0) {
-      console.log("Bảng trống → lấy dữ liệu AQI...");
+      console.log("Bảng trống → đang lấy dữ liệu từ AQICN...");
       await updateAQIData();
+    } else {
+      console.log(`Đã có ${rows[0].count} trạm trong database`);
     }
   } catch (err) {
-    console.error("Lỗi kiểm tra bảng:", err.message); // THÊM log
+    console.error("Lỗi kiểm tra dữ liệu:", err.message);
   }
 
   // CẬP NHẬT MỖI GIỜ
   cron.schedule("0 * * * *", () => {
-    console.log("Cập nhật AQI định kỳ...");
-    updateAQIData().catch((err) =>
-      console.error("Lỗi cập nhật định kỳ:", err.message)
-    );
+    console.log("Bắt đầu cập nhật AQI định kỳ...");
+    updateAQIData().catch(() => {});
   });
 
-  console.log("HỆ THỐNG ĐÃ HOÀN TẤT – TRUY CẬP WEB NGAY!");
+  console.log("HỆ THỐNG AQI HÀ NỘI ĐÃ HOẠT ĐỘNG ");
 });
