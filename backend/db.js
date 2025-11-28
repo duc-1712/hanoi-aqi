@@ -19,17 +19,14 @@
 //   password: process.env.PGPASSWORD,
 //   port: process.env.PGPORT,
 // });
-// db.js – CHẠY NGON 100% TRÊN RENDER (bắt buộc phải thế này)
-import { Pool } from "pg";
-import dotenv from "dotenv";
 
-// Đảm bảo đọc đúng file .Bạn đang ở backend/db.js → lên 2 cấp để tới thư mục gốc
-dotenv.config({ path: "./.env" }); // hoặc: path.resolve(process.cwd(), ".env")
+// db.js – CHẠY render
+import { Pool } from "pg";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false, // BẮT BUỘC với Render PostgreSQL miễn phí
+    rejectUnauthorized: false, // BẮT BUỘC với Render PostgreSQL
   },
 });
 
