@@ -15,41 +15,45 @@ const STATIONS = [
   {
     name: "Đại sứ quán Mỹ (Láng Hạ)",
     uid: "6748",
-    lat: 21.0215,
-    lon: 105.8188,
+    lat: 21.00748, // CHUẨN như aqicn.org
+    lon: 105.80554,
   },
   {
     name: "Chi cục BVMT (Cầu Giấy)",
-    uid: "34747", // UID MỚI NHẤT & CHÍNH XÁC NHẤT của 36 Cầu Giấy
-    lat: 21.0133,
-    lon: 105.8166,
+    uid: "34747",
+    lat: 21.03583, // 36 Trần Thái Tông, chính xác tuyệt đối
+    lon: 105.79861,
   },
   {
     name: "Hàng Đậu",
     uid: "9509",
-    lat: 21.0417,
-    lon: 105.8492,
+    lat: 21.04172,
+    lon: 105.84917,
   },
   {
     name: "Hoàn Kiếm",
     uid: "11158",
-    lat: 21.0292,
-    lon: 105.8522,
+    lat: 21.02888, // Ngay 66 Nguyễn Du
+    lon: 105.85223,
   },
   {
     name: "Tây Mỗ",
     uid: "11159",
-    lat: 21.0058,
-    lon: 105.7122,
+    lat: 21.00503, // Chuẩn vị trí trạm Tây Mỗ
+    lon: 105.71204,
   },
   {
     name: "Thành Công",
     uid: "11160",
-    lat: 21.0219,
-    lon: 105.8094,
+    lat: 21.01952,
+    lon: 105.81351,
   },
-  // Muốn thêm trạm khác thì bỏ comment và thêm vào đây
-  // { name: "Minh Khai (Bắc Từ Liêm)", uid: "9510", lat: 21.0536, lon: 105.7355 },
+  {
+    name: "Minh Khai (Bắc Từ Liêm)",
+    uid: "9510",
+    lat: 21.05362,
+    lon: 105.73548,
+  },
 ];
 
 export async function updateAQIData() {
