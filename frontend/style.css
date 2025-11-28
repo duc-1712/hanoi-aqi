@@ -1,144 +1,163 @@
-/* Cài đặt chung */
+:root {
+    --primary: #2563eb;
+    --bg: #f3f4f6;
+    --surface: #ffffff;
+    --text: #1f2937;
+    --border: #e5e7eb;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
 body, html {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  /* QUAN TRỌNG: Cho phép cuộn trang */
-  overflow-y: auto; 
-  background-color: #f4f6f9;
+    margin: 0; padding: 0; width: 100%; 
+    /* BỎ height: 100vh để trang web có thể dài hơn màn hình */
+    min-height: 100vh;
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg); color: var(--text);
+    display: flex; flex-direction: column;
+    /* QUAN TRỌNG: Cho phép cuộn */
+    overflow-x: hidden; 
+    overflow-y: auto;
 }
 
+/* HEADER */
 header {
-  background-color: #007bff;
-  color: white;
-  padding: 0 20px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 1002;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background-color: var(--primary); color: white;
+    height: 60px; display: flex; align-items: center;
+    padding: 0 20px; box-shadow: var(--shadow); z-index: 2000;
+    position: sticky; top: 0; /* Header dính chặt trên cùng */
 }
-header h1 { font-size: 1.3em; margin: 0; }
-
-/* Nút toggle sidebar */
+.header-content { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+header h1 { font-size: 1.2rem; margin: 0; font-weight: 600; }
 #toggle-sidebar {
-  background: transparent; border: 1px solid rgba(255,255,255,0.5); 
-  color: white; font-size: 1.2em; cursor: pointer; padding: 5px 10px; 
-  border-radius: 4px; transition: 0.2s;
+    background: none; border: 1px solid rgba(255,255,255,0.3);
+    color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer;
 }
-#toggle-sidebar:hover { background: rgba(255,255,255,0.2); }
+#toggle-sidebar:hover { background: rgba(255,255,255,0.1); }
 
-/* --- PHẦN 1: TOP CONTAINER (Sidebar + Map) --- */
+/* TOP CONTAINER (Map + Sidebar) */
 #top-container {
-  display: flex;
-  /* Chiếm 85% chiều cao viewport để người dùng biết bên dưới còn nội dung */
-  height: 85vh; 
-  border-bottom: 4px solid #e9ecef;
-  position: relative;
+    display: flex; 
+    height: 600px; /* Chiều cao cố định cho phần bản đồ */
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    background: white;
 }
 
-/* Sidebar */
 #sidebar {
-  width: 320px;
-  background: white;
-  border-right: 1px solid #ddd;
-  overflow-y: auto;
-  padding: 15px;
-  flex-shrink: 0;
-  transition: transform 0.3s ease;
-  z-index: 1000;
+    width: 350px; background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    transition: transform 0.3s ease; z-index: 1000;
+    height: 100%; /* Full chiều cao của top-container */
 }
-#sidebar.hidden {
-  margin-left: -320px; /* Ẩn sidebar bằng margin âm */
+#sidebar.hidden { margin-left: -350px; }
+
+.sidebar-header { padding: 15px; border-bottom: 1px solid var(--border); }
+.sidebar-header h2 { margin: 0; font-size: 1.1rem; color: var(--primary); }
+
+.list-wrapper { flex: 1; overflow-y: auto; padding: 10px; }
+#station-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.station-card {
+    background: white; border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; cursor: pointer;
+    transition: all 0.2s; display: flex; justify-content: space-between; align-items: center;
 }
-#sidebar h2 {
-    margin-top: 0; border-bottom: 2px solid #007bff; 
-    padding-bottom: 5px; color: #333; font-size: 1.2em;
+.station-card:hover { border-color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.station-card.active { border-color: var(--primary); background-color: #eff6ff; }
+
+.st-name { font-weight: 600; font-size: 0.95rem; }
+.st-aqi {
+    font-weight: 800;
+    font-size: 1.05rem;
+    padding: 7px 16px;
+    border-radius: 10px;
+    color: white;
+    min-width: 68px;
+    width: auto;
+    text-align: center;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.25);
+    border: 2px solid rgba(255,255,255,0.3);
+    background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
+    backdrop-filter: blur(4px);
 }
 
-#station-list { list-style: none; padding: 0; }
-#station-list li {
-  padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;
-}
-#station-list li:hover { background-color: #f0f8ff; }
+.legend-box { padding: 15px; background: #f9fafb; border-top: 1px solid var(--border); }
+.legend-box h3 { margin: 0 0 10px 0; font-size: 0.9rem; color: #666; }
+.legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.8rem; }
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 2px; }
 
-/* Chú giải màu */
-.legend { width: 100%; font-size: 0.9em; margin-top: 15px; border-collapse: collapse;}
-.legend td { padding: 5px; }
-.legend td:first-child { width: 20px; height: 20px; border: 1px solid #ccc; }
+#map { flex: 1; background: #e5e7eb; height: 100%; }
 
-/* Bản đồ */
-#map {
-  flex: 1;
-  height: 100%;
-  background-color: #ddd;
-  z-index: 1;
-}
-
-/* --- PHẦN 2: BOTTOM CONTAINER (Chart + Table) --- */
+/* BOTTOM CONTAINER (Charts + Table) */
 #bottom-container {
-  padding: 20px;
-  background-color: #fff;
-  min-height: 500px;
+    background: var(--bg);
+    padding: 30px 20px;
+    /* Không giới hạn chiều cao nữa */
 }
-
 .container-wrapper {
-  display: flex;
-  gap: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
+    display: flex; gap: 20px; max-width: 1400px; margin: 0 auto;
+    align-items: flex-start; /* Căn đỉnh các cột */
 }
 
-/* Cột biểu đồ */
-.chart-section {
-  flex: 2; /* Chiếm 2/3 */
-  border: 1px solid #ddd; padding: 15px;
-  border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+/* Charts Column */
+.chart-section { 
+    flex: 3; background: white; 
+    border-radius: 8px; border: 1px solid var(--border); 
+    padding: 20px; 
+    box-shadow: var(--shadow);
 }
-#pm25-chart { width: 100%; height: 400px; }
-#chart-instruction { 
-    text-align: center; margin-top: 100px; color: #888; font-style: italic; 
-}
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;}
+.section-header h3 { margin: 0; color: var(--primary); }
+.badge { background: #e5e7eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; }
 
-/* Cột bảng */
-.table-section {
-  flex: 1; /* Chiếm 1/3 */
-  border: 1px solid #ddd; padding: 15px;
-  border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-  overflow-x: auto;
+#chart-instruction {
+    text-align: center; padding: 50px; color: #9ca3af;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
+#charts-wrapper { display: flex; flex-direction: column; gap: 20px; }
+.chart-row { display: flex; gap: 20px; }
+.chart-card {
+    flex: 1; background: #fafafa; border: 1px solid #eee;
+    border-radius: 8px; padding: 15px;
+}
+.chart-card h4 { margin: 0 0 10px 0; font-size: 0.9rem; color: #555; text-align: center;}
+.chart-canvas { width: 100%; height: 200px; }
 
-.table-section h3, .chart-section h3 {
-  margin-top: 0; color: #0056b3; border-bottom: 2px solid #0056b3;
-  padding-bottom: 10px; font-size: 1.1em;
+/* Table Column */
+.table-section { 
+    flex: 1; background: white; 
+    border-radius: 8px; border: 1px solid var(--border); 
+    padding: 20px; min-width: 300px;
+    box-shadow: var(--shadow);
 }
+.table-section h3 { margin-top: 0; font-size: 1rem; color: #374151; }
 
-/* Style cho bảng giống hình mẫu */
-.standard-table {
-  width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 10px;
-}
-.standard-table th {
-  background-color: #f8f9fa; padding: 8px; border: 1px solid #ccc; font-weight: bold;
-}
-.standard-table td {
-  padding: 8px; border: 1px solid #ccc; text-align: center;
-}
-.standard-table tr:nth-child(even) { background-color: #fcfcfc; }
+.standard-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 10px; }
+.standard-table th, .standard-table td { border: 1px solid #e5e7eb; padding: 8px; text-align: center; }
+.standard-table th { background: #f9fafb; font-weight: 600; }
+.unit-label { font-size: 0.8rem; color: #6b7280; text-align: right; margin: 0; }
+.note { font-size: 0.75rem; color: #9ca3af; margin-top: 5px; font-style: italic;}
 
-.unit-label { font-size: 0.85em; color: #666; text-align: right; margin-bottom: 5px;}
-.note { font-size: 0.8em; color: #666; margin-top: 10px; font-style: italic;}
+/* Current Stats */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+.stat-item { background: #f3f4f6; padding: 10px; border-radius: 6px; text-align: center; }
+.stat-label { display: block; font-size: 0.75rem; color: #6b7280; text-transform: uppercase; }
+.stat-val { font-weight: 700; font-size: 1.1rem; color: var(--primary); }
 
-footer {
-  text-align: center; padding: 10px; background: #343a40; color: white; font-size: 0.8em;
-}
+/* Helper Classes */
+.hidden { display: none !important; }
+.loading { padding: 20px; text-align: center; color: #6b7280; }
 
-/* Responsive Mobile */
-@media (max-width: 768px) {
-  .container-wrapper { flex-direction: column; }
-  #top-container { height: 60vh; }
-  #sidebar { position: absolute; height: 100%; box-shadow: 2px 0 5px rgba(0,0,0,0.2); }
+footer { text-align: center; padding: 20px; font-size: 0.8rem; color: #9ca3af; background: var(--surface); border-top: 1px solid var(--border); margin-top: auto;}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .container-wrapper { flex-direction: column; }
+    .chart-row { flex-direction: column; }
+    #top-container { height: 500px; flex-direction: column; }
+    #sidebar { width: 100%; height: 40%; border-right: none; border-bottom: 1px solid var(--border); }
+    #sidebar.hidden { margin-left: 0; display: none; }
+    #map { height: 60%; }
 }

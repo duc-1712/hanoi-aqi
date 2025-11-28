@@ -5,6 +5,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Giám sát chất lượng không khí Hà Nội</title>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -13,44 +18,35 @@
 
 <body>
   <header>
-    <h1>🌤️ Hệ thống giám sát chất lượng không khí Hà Nội</h1>
-    <button id="toggle-sidebar">☰</button>
+    <div class="header-content">
+      <h1><i class="fa-solid fa-wind"></i> Hệ thống giám sát chất lượng không khí Hà Nội</h1>
+      <button id="toggle-sidebar" title="Ẩn/Hiện danh sách"><i class="fa-solid fa-bars"></i></button>
+    </div>
   </header>
 
   <div id="top-container">
     <aside id="sidebar">
-      <h2>📍 Danh sách trạm đo</h2>
-      <ul id="station-list">
-        <li>Đang tải dữ liệu trạm...</li>
-      </ul>
+      <div class="sidebar-header">
+        <h2><i class="fa-solid fa-location-dot"></i> Các trạm quan trắc</h2>
+      </div>
 
-      <h3>🌈 Thang màu AQI</h3>
-      <table class="legend">
-        <tr>
-          <td style="background: #00e400"></td>
-          <td>Tốt (0–50)</td>
-        </tr>
-        <tr>
-          <td style="background: #ffff00"></td>
-          <td>Trung bình (51–100)</td>
-        </tr>
-        <tr>
-          <td style="background: #ff7e00"></td>
-          <td>Kém (101–150)</td>
-        </tr>
-        <tr>
-          <td style="background: #ff0000"></td>
-          <td>Xấu (151–200)</td>
-        </tr>
-        <tr>
-          <td style="background: #8f3f97"></td>
-          <td>Rất xấu (201–300)</td>
-        </tr>
-        <tr>
-          <td style="background: #7e0023"></td>
-          <td>Nguy hiểm (301+)</td>
-        </tr>
-      </table>
+      <div class="list-wrapper">
+        <ul id="station-list">
+          <li class="loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải dữ liệu...</li>
+        </ul>
+      </div>
+
+      <div class="legend-box">
+        <h3><i class="fa-solid fa-palette"></i> Thang màu AQI</h3>
+        <div class="legend-grid">
+          <div class="legend-item"><span class="dot" style="background:#00e400"></span> Tốt (0–50)</div>
+          <div class="legend-item"><span class="dot" style="background:#ffff00"></span> Trung bình (51–100)</div>
+          <div class="legend-item"><span class="dot" style="background:#ff7e00"></span> Kém (101–150)</div>
+          <div class="legend-item"><span class="dot" style="background:#ff0000"></span> Xấu (151–200)</div>
+          <div class="legend-item"><span class="dot" style="background:#8f3f97"></span> Rất xấu (201–300)</div>
+          <div class="legend-item"><span class="dot" style="background:#7e0023"></span> Nguy hại (301+)</div>
+        </div>
+      </div>
     </aside>
 
     <main id="map"></main>
@@ -59,25 +55,61 @@
   <div id="bottom-container">
     <div class="container-wrapper">
 
+      <!-- CỘT 1: BIỂU ĐỒ LỊCH SỬ -->
       <div class="chart-section">
-        <h3 id="chart-title">Lịch sử quan trắc</h3>
-        <p id="chart-instruction">Vui lòng chọn một trạm trên bản đồ để xem lịch sử.</p>
+        <div class="section-header">
+          <h3 id="chart-title"><i class="fa-solid fa-chart-line"></i> Lịch sử quan trắc</h3>
+          <span id="selected-station-name" class="badge">Chưa chọn trạm</span>
+        </div>
 
-        <div id="charts-wrapper" style="height: 600px; overflow-y: auto; padding-right: 10px;">
-          <div id="chart-pm25" style="width: 100%; height: 250px; margin-bottom: 30px;"></div>
-          <div id="chart-pm10" style="width: 100%; height: 250px; margin-bottom: 30px;"></div>
-          <div id="chart-no2" style="width: 100%; height: 250px; margin-bottom: 30px;"></div>
-          <div id="chart-co" style="width: 100%; height: 250px; margin-bottom: 30px;"></div>
+        <div id="chart-instruction">
+          <i class="fa-solid fa-hand-pointer fa-2x"></i>
+          <p>Vui lòng chọn một trạm trên bản đồ để xem chi tiết.</p>
+        </div>
+
+        <div id="charts-wrapper" class="hidden">
+          <!-- Các biểu đồ con -->
+          <div class="chart-row">
+            <div class="chart-card">
+              <h4>PM2.5 (Bụi mịn)</h4>
+              <div id="chart-pm25" class="chart-canvas"></div>
+            </div>
+            <div class="chart-card">
+              <h4>PM10 (Bụi)</h4>
+              <div id="chart-pm10" class="chart-canvas"></div>
+            </div>
+          </div>
+          <div class="chart-row">
+            <div class="chart-card">
+              <h4>NO₂ (Nitơ Đioxit)</h4>
+              <div id="chart-no2" class="chart-canvas"></div>
+            </div>
+            <div class="chart-card">
+              <h4>CO (Cacbon Monoxit)</h4>
+              <div id="chart-co" class="chart-canvas"></div>
+            </div>
+          </div>
+          <!-- Thêm O3 và SO2 -->
+          <div class="chart-row">
+            <div class="chart-card">
+              <h4>O₃ (Ozone)</h4>
+              <div id="chart-o3" class="chart-canvas"></div>
+            </div>
+            <div class="chart-card">
+              <h4>SO₂ (Lưu huỳnh Đioxit)</h4>
+              <div id="chart-so2" class="chart-canvas"></div>
+            </div>
+          </div>
         </div>
       </div>
 
+      <!-- CỘT 2: BẢNG GIÁ TRỊ -->
       <div class="table-section">
-        <h3>Giá trị giới hạn (QCVN 05:2013/BTNMT)</h3>
-        <p class="unit-label">Đơn vị: Microgam trên mét khối (µg/m³)</p>
+        <h3><i class="fa-solid fa-circle-info"></i> Giá trị giới hạn (QCVN 05:2013)</h3>
+        <p class="unit-label">Đơn vị: µg/m³</p>
         <table class="standard-table">
           <thead>
             <tr>
-              <th>TT</th>
               <th>Thông số</th>
               <th>TB 1 giờ</th>
               <th>TB 24 giờ</th>
@@ -86,42 +118,36 @@
           </thead>
           <tbody>
             <tr>
-              <td>1</td>
               <td><b>SO₂</b></td>
               <td>350</td>
               <td>125</td>
               <td>50</td>
             </tr>
             <tr>
-              <td>2</td>
               <td><b>CO</b></td>
               <td>30.000</td>
               <td>-</td>
               <td>-</td>
             </tr>
             <tr>
-              <td>3</td>
               <td><b>NO₂</b></td>
               <td>200</td>
               <td>100</td>
               <td>40</td>
             </tr>
             <tr>
-              <td>4</td>
               <td><b>O₃</b></td>
               <td>200</td>
               <td>-</td>
               <td>-</td>
             </tr>
             <tr>
-              <td>5</td>
               <td><b>PM₁₀</b></td>
               <td>-</td>
               <td>100</td>
               <td>50</td>
             </tr>
             <tr>
-              <td>6</td>
               <td><b>PM₂.₅</b></td>
               <td>-</td>
               <td>50</td>
@@ -130,12 +156,32 @@
           </tbody>
         </table>
         <p class="note">(*): Dấu (-) là không quy định.</p>
+
+        <!-- Thêm phần hiển thị thông số hiện tại -->
+        <div id="current-stats" class="hidden">
+          <h3 style="margin-top: 20px; border-top: 1px dashed #ddd; padding-top: 15px;">
+            <i class="fa-solid fa-clock"></i> Chỉ số hiện tại
+          </h3>
+          <div class="stat-grid">
+            <div class="stat-item"><span class="stat-label">AQI</span><span class="stat-val" id="val-aqi">--</span>
+            </div>
+            <div class="stat-item"><span class="stat-label">PM2.5</span><span class="stat-val" id="val-pm25">--</span>
+            </div>
+            <div class="stat-item"><span class="stat-label">PM10</span><span class="stat-val" id="val-pm10">--</span>
+            </div>
+            <div class="stat-item"><span class="stat-label">NO₂</span><span class="stat-val" id="val-no2">--</span>
+            </div>
+            <div class="stat-item"><span class="stat-label">CO</span><span class="stat-val" id="val-co">--</span></div>
+            <div class="stat-item"><span class="stat-label">SO₂</span><span class="stat-val" id="val-so2">--</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <footer>
-    <p>Nguồn dữ liệu: <a href="https://aqicn.org/" target="_blank">AQICN API</a></p>
+    <p>Nguồn dữ liệu: <a href="https://aqicn.org/" target="_blank">AQICN API</a> &copy; 2025</p>
   </footer>
 
   <script src="script.js" defer></script>

@@ -2,79 +2,181 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import cron from "node-cron";
-import { pool } from "./db.js";
-import { updateAQIData } from "./fetch_aqi.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import { pool } from "./db.js";
+import { updateAQIData } from "./fetch_aqi.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// Middleware
+app.use(
+  cors({
+    origin: "*", // hoặc cụ thể: "http://localhost:3000"
+  })
+);
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "../frontend")));
 
-// --- API 1: LẤY DANH SÁCH TRẠM (Cho bản đồ) ---
+// ==================== API ROUTES ====================
+
+// API 1: Lấy danh sách tất cả trạm (dùng cho bản đồ)
 app.get("/api/stations", async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      "SELECT * FROM stations WHERE city = 'Hanoi'"
-    );
-    res.json(rows);
+    const { rows } = await pool.query(`
+      SELECT 
+        name, aqi, pm25, pm10, o3, no2, so2, co, 
+        lat, lon, last_update 
+      FROM stations 
+      WHERE aqi IS NOT NULL AND lat IS NOT NULL AND lon IS NOT NULL
+      ORDER BY name
+    `);
+
+    // Nếu chưa có dữ liệu → trả mảng rỗng (không lỗi đỏ)
+    res.json(rows.length > 0 ? rows : []);
   } catch (err) {
-    console.error("Lỗi DB:", err.message);
-    res.status(500).json({ error: "Lỗi máy chủ" });
+    console.error("Lỗi lấy danh sách trạm:", err.message);
+    res.status(500).json({ error: "Lỗi máy chủ nội bộ" });
   }
 });
 
-// --- API 2: LẤY LỊCH SỬ (Cho biểu đồ) - ĐÃ CẬP NHẬT ---
+// API 2: Lịch sử 24h gần nhất của 1 trạm (dùng cho biểu đồ chi tiết)
 app.get("/api/history", async (req, res) => {
   const { name } = req.query;
   if (!name) return res.status(400).json({ error: "Thiếu tên trạm" });
 
   try {
-    // Lấy đủ các chỉ số: PM2.5, PM10, NO2, CO, O3
     const { rows } = await pool.query(
-      `SELECT recorded_at, pm25, pm10, no2, co, o3 
-       FROM station_history 
-       WHERE station_name = $1 
-       ORDER BY recorded_at ASC`,
+      `
+      SELECT recorded_at, aqi, pm25, pm10, o3, no2, so2, co
+      FROM station_history
+      WHERE station_name = $1
+      ORDER BY recorded_at DESC
+      LIMIT 48
+    `,
       [name]
     );
 
-    // Chuẩn hóa dữ liệu trả về
-    const times = rows.map((row) => {
-      const d = new Date(row.recorded_at);
-      return `${d.getDate()}/${d.getMonth() + 1} ${d.getHours()}:00`;
+    if (rows.length === 0) {
+      return res.json({
+        times: [],
+        pm25: [],
+        pm10: [],
+        o3: [],
+        no2: [],
+        so2: [],
+        co: [],
+      });
+    }
+
+    const reversed = rows.reverse();
+    const times = reversed.map((r) => {
+      const d = new Date(r.recorded_at);
+      return `${d.getHours().toString().padStart(2, "0")}:${d
+        .getMinutes()
+        .toString()
+        .padStart(2, "0")}`;
     });
 
     res.json({
-      times: times,
-      pm25: rows.map((row) => row.pm25),
-      pm10: rows.map((row) => row.pm10),
-      no2: rows.map((row) => row.no2),
-      co: rows.map((row) => row.co),
-      o3: rows.map((row) => row.o3),
+      times,
+      aqi: reversed.map((r) => r.aqi),
+      pm25: reversed.map((r) => r.pm25),
+      pm10: reversed.map((r) => r.pm10),
+      o3: reversed.map((r) => r.o3),
+      no2: reversed.map((r) => r.no2),
+      so2: reversed.map((r) => r.so2),
+      co: reversed.map((r) => r.co),
     });
   } catch (err) {
-    console.error("Lỗi lấy lịch sử:", err);
+    console.error("Lỗi lấy lịch sử:", err.message);
     res.status(500).json({ error: "Lỗi server" });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🌍 Server đang chạy tại http://localhost:${PORT}`);
+// API 3: Dữ liệu lưu trữ dài hạn Hà Nội (biểu đồ năm)
+app.get("/api/hanoi-archive", async (req, res) => {
+  try {
+    const archive = await pool.query(`
+      SELECT record_date, pm25 FROM hanoi_archive ORDER BY record_date ASC
+    `);
 
-  console.log("Khởi động, lấy dữ liệu lần đầu...");
-  updateAQIData();
+    const todayAvg = await pool.query(`
+      SELECT AVG(pm25)::INTEGER as avg_pm25 
+      FROM stations 
+      WHERE pm25 IS NOT NULL
+    `);
 
+    const data = archive.rows.map((row) => ({
+      date: new Date(row.record_date).toLocaleDateString("vi-VN"),
+      pm25: row.pm25 ? Math.round(row.pm25) : null,
+    }));
+
+    if (todayAvg.rows[0].avg_pm25) {
+      data.push({
+        date: "Hôm nay",
+        pm25: Math.round(todayAvg.rows[0].avg_pm25),
+      });
+    }
+
+    res.json(data);
+  } catch (err) {
+    console.error("Lỗi lấy dữ liệu archive:", err.message);
+    res.status(500).json({ error: "Lỗi lấy dữ liệu lưu trữ" });
+  }
+});
+
+// Fallback: phục vụ index.html cho mọi route (SPA)
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/index.html"));
+});
+
+// ==================== SERVER START ====================
+app.listen(PORT, async () => {
+  console.log(`\nServer đang chạy tại http://localhost:${PORT}`);
+
+  try {
+    // Kiểm tra có dữ liệu chưa
+    const { rows } = await pool.query("SELECT COUNT(*) FROM stations");
+    const count = parseInt(rows[0].count);
+
+    if (count === 0) {
+      console.log("Bảng stations trống → Lấy dữ liệu lần đầu...");
+      await updateAQIData();
+    } else {
+      const recent = await pool.query(`
+        SELECT last_update FROM stations ORDER BY last_update DESC LIMIT 1
+      `);
+      const lastUpdate = recent.rows[0]?.last_update;
+      const minutesAgo = lastUpdate
+        ? Math.floor((Date.now() - new Date(lastUpdate)) / 60000)
+        : 999;
+
+      console.log(
+        `Đã có ${count} trạm, cập nhật lần cuối: ${minutesAgo} phút trước`
+      );
+
+      if (minutesAgo > 30) {
+        console.log("Dữ liệu hơi cũ → Cập nhật ngay...");
+        updateAQIData();
+      }
+    }
+  } catch (err) {
+    console.error("Lỗi khởi động:", err.message);
+    console.log("Vẫn cố cập nhật dữ liệu...");
+    updateAQIData();
+  }
+
+  // Cập nhật tự động mỗi 15 phút
   cron.schedule("*/15 * * * *", () => {
-    console.log("Đến giờ cập nhật (15 phút)...");
+    console.log("⏰ Đang cập nhật dữ liệu AQI (15 phút/lần)...");
     updateAQIData();
   });
+
+  console.log("Hệ thống giám sát không khí Hà Nội đã sẵn sàng!\n");
 });
