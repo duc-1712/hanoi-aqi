@@ -10,16 +10,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app
-  .use(cors())
-  .use(express.json())
-  .use(express.static(path.join(__dirname, "../frontend")));
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "../frontend")));
 
-// API: Lấy danh sách tất cả trạm
+// API: Lấy danh sách trạm hiện tại
 app.get("/api/stations", async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT name, aqi, pm25, pm10, o3, no2, so2, co, lat, lon 
+      SELECT name, aqi, pm25, pm10, o3, no2, so2, co, lat, lon, last_update
       FROM stations 
       WHERE lat IS NOT NULL 
       ORDER BY name
@@ -31,7 +30,7 @@ app.get("/api/stations", async (req, res) => {
   }
 });
 
-// API: Lấy lịch sử 48 điểm gần nhất của 1 trạm
+// API: Lịch sử 48 điểm gần nhất + hiển thị ngày tháng
 app.get("/api/history", async (req, res) => {
   const { name } = req.query;
   if (!name) return res.status(400).json({ error: "Thiếu tên trạm" });
@@ -57,18 +56,17 @@ app.get("/api/history", async (req, res) => {
         no2: [],
         so2: [],
         co: [],
-        recorded_at: [],
       });
     }
 
     const reversed = rows.reverse();
-    const times = rev.map((r) => {
+    const times = reversed.map((r) => {
       const d = new Date(r.recorded_at);
-      const day = d.getDate().toString().padStart(2, "0");
-      const month = (d.getMonth() + 1).toString().padStart(2, "0");
-      const hour = d.getHours().toString().padStart(2, "0");
-      const minute = d.getMinutes().toString().padStart(2, "0");
-      return `${day}/${month} ${hour}:${minute}`; // Ví dụ: "28/11 13:11"
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const hour = String(d.getHours()).padStart(2, "0");
+      const minute = String(d.getMinutes()).padStart(2, "0");
+      return `${day}/${month} ${hour}:${minute}`;
     });
 
     res.json({
@@ -80,7 +78,6 @@ app.get("/api/history", async (req, res) => {
       no2: reversed.map((r) => r.no2 ?? null),
       so2: reversed.map((r) => r.so2 ?? null),
       co: reversed.map((r) => r.co ?? null),
-      recorded_at: reversed.map((r) => r.recorded_at),
     });
   } catch (err) {
     console.error("Lỗi /api/history:", err.message);
@@ -96,9 +93,11 @@ app.get("*", (req, res) => {
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, async () => {
-  console.log(`Server chạy tại https://hanoi-aqi.onrender.com (cổng ${PORT})`);
+  console.log(
+    `\nSERVER CHẠY TẠI https://hanoi-aqi.onrender.com (cổng ${PORT})\n`
+  );
 
-  // Kiểm tra kết nối DB
+  // 1. Kiểm tra kết nối DB
   try {
     await pool.query("SELECT 1");
     console.log("Kết nối PostgreSQL thành công!");
@@ -107,7 +106,7 @@ app.listen(PORT, async () => {
     process.exit(1);
   }
 
-  // Tạo bảng (nếu chưa có)
+  // 2. Tạo bảng (nếu chưa có)
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS stations (
@@ -134,22 +133,39 @@ app.listen(PORT, async () => {
     process.exit(1);
   }
 
-  // Lấy dữ liệu lần đầu nếu bảng trống
-  const { rows } = await pool.query("SELECT COUNT(*) FROM stations");
-  if (parseInt(rows[0].count) === 0) {
-    console.log("Bảng trống → Lấy dữ liệu AQI lần đầu...");
-    await updateAQIData();
+  // 3. Lấy dữ liệu lần đầu nếu bảng trống
+  try {
+    const { rows } = await pool.query("SELECT COUNT(*) FROM stations");
+    if (parseInt(rows[0].count) === 0) {
+      console.log("Bảng trống → Lấy dữ liệu AQI lần đầu...");
+      await updateAQIData();
+    } else {
+      console.log(`Đã có dữ liệu ${rows[0].count} trạm – hệ thống sẵn sàng!`);
+    }
+  } catch (err) {
+    console.error("Lỗi kiểm tra dữ liệu:", err.message);
   }
 
-  // CẬP NHẬT MỖI 30 PHÚT (tốt nhất cho nộp bài & dùng lâu dài)
+  // 4. Cập nhật mỗi 30 phút – realtime chuẩn chính thức
   cron.schedule("0,30 * * * *", async () => {
     console.log(
-      `[AUTO] Cập nhật AQI lúc ${new Date().toLocaleString("vi-VN")}`
+      `\n[AUTO] Cập nhật AQI - ${new Date().toLocaleString("vi-VN")}`
     );
     await updateAQIData();
+
+    try {
+      const { rowCount } = await pool.query(`
+        DELETE FROM station_history 
+        WHERE recorded_at < NOW() - INTERVAL '10 days'
+      `);
+      if (rowCount > 0)
+        console.log(`Đã xóa ${rowCount} bản ghi cũ hơn 10 ngày`);
+    } catch (err) {
+      console.error("Lỗi dọn dẹp history:", err.message);
+    }
   });
 
-  // NGĂN RENDER FREE SLEEP (quan trọng nhất!)
+  // 5. Ngăn Render sleep (free tier)
   setInterval(() => {
     fetch("https://hanoi-aqi.onrender.com/api/stations")
       .then(() =>
@@ -158,6 +174,6 @@ app.listen(PORT, async () => {
       .catch(() => {});
   }, 10 * 60 * 1000); // mỗi 10 phút
 
-  console.log("HỆ THỐNG AQI HÀ NỘI HOẠT ĐỘNG THÀNH CÔNG!");
-  console.log("Link truy cập: https://hanoi-aqi.onrender.com");
+  console.log("\nHỆ THỐNG GIÁM SÁT AQI HÀ NỘI HOẠT ĐỘNG ");
+  console.log("Link truy cập: https://hanoi-aqi.onrender.com\n");
 });
