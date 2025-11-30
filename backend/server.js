@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "../frontend")));
 
-// API DANH SÁCH TRẠM AQI HIỆN TẠI
+// API DANH SÁCH TRẠM
 app.get("/api/stations", async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -30,18 +30,19 @@ app.get("/api/stations", async (req, res) => {
   }
 });
 
-// API LỊCH SỬ – HOURLY + DAILY (7 ngày gần nhất)
+// API LỊCH SỬ – HOURLY + DAILY
+
 app.get("/api/history", async (req, res) => {
   const { name, mode } = req.query;
   if (!name) return res.status(400).json({ error: "Thiếu tên trạm" });
 
   try {
-    // DAILY MODE – 7 ngày gần nhất
+    // DAILY MODE (7 ngày gần nhất)
     if (mode === "daily") {
       const { rows } = await pool.query(
         `
         SELECT 
-          DATE(recorded_at AT TIME ZONE 'Asia/Ho_Chi_Minh') AS date,
+          DATE(recorded_at + INTERVAL '7 hours') AS date,
           COALESCE(AVG(aqi), 0)::INTEGER AS aqi,
           ROUND(AVG(pm25), 1) AS pm25,
           ROUND(AVG(pm10), 1) AS pm10,
@@ -51,11 +52,11 @@ app.get("/api/history", async (req, res) => {
           ROUND(AVG(co), 1) AS co
         FROM station_history
         WHERE station_name = $1
-          AND recorded_at >= NOW() - INTERVAL '10 days'
-        GROUP BY DATE(recorded_at AT TIME ZONE 'Asia/Ho_Chi_Minh')
+          AND recorded_at >= NOW() - INTERVAL '12 days'
+        GROUP BY DATE(recorded_at + INTERVAL '7 hours')
         ORDER BY date DESC
         LIMIT 7
-      `,
+        `,
         [name]
       );
 
@@ -72,7 +73,7 @@ app.get("/api/history", async (req, res) => {
         });
       }
 
-      const reversed = rows.reverse();
+      const reversed = rows.reverse(); // cũ nhất trước
       const dates = reversed.map((r) => {
         const d = new Date(r.date);
         return `${String(d.getDate()).padStart(2, "0")}/${String(
@@ -91,7 +92,8 @@ app.get("/api/history", async (req, res) => {
         co: reversed.map((r) => r.co ?? null),
       });
     }
-    // HOURLY MODE (mặc định)
+
+    // ================= HOURLY MODE (mặc định) =================
     else {
       const { rows } = await pool.query(
         `
@@ -102,7 +104,7 @@ app.get("/api/history", async (req, res) => {
         WHERE station_name = $1 
         ORDER BY recorded_at DESC 
         LIMIT 72
-      `,
+        `,
         [name]
       );
 
@@ -155,7 +157,7 @@ app.get("*", (req, res) => {
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, async () => {
-  console.log(`\nSERVER CHẠY TẠI https://hanoi-aqi.onrender.com:${PORT}\n`);
+  console.log(`\nSERVER CHẠY TẠI https://hanoi-aqi.onrender.com\n`);
 
   try {
     await pool.query("SELECT 1");
@@ -164,7 +166,7 @@ app.listen(PORT, async () => {
     console.error("LỖI KẾT NỐI DB:", err.message);
     process.exit(1);
   }
-
+  // Tạo bảng nếu chưa có
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS stations (
@@ -177,39 +179,27 @@ app.listen(PORT, async () => {
         last_update TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
 
-      -- ĐÚNG KIỂU DỮ LIỆU CỦA BẠN: timestamp WITHOUT time zone
       CREATE TABLE IF NOT EXISTS station_history (
         id SERIAL PRIMARY KEY,
         station_name VARCHAR(255) NOT NULL,
         aqi INTEGER,
-        pm25 REAL,
-        pm10 REAL,
-        o3 REAL,
-        no2 REAL,
-        so2 REAL,
-        co REAL,
+        pm25 REAL, pm10 REAL, o3 REAL, no2 REAL, so2 REAL, co REAL,
         recorded_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh')
       );
     `);
-    console.log(
-      "Bảng đã sẵn sàng (không thay đổi cấu trúc → dữ liệu an toàn 100%)"
-    );
+    console.log("Bảng đã sẵn sàng – DỮ LIỆU AN TOÀN 100%");
   } catch (err) {
-    console.log("Bảng đã tồn tại → bỏ qua tạo mới");
+    console.log("Bảng đã tồn tại → Không thay đổi");
   }
 
-  // Nếu bảng trống → lấy dữ liệu lần đầu
-  try {
-    const { rows } = await pool.query("SELECT COUNT(*) FROM stations");
-    if (parseInt(rows[0].count) === 0) {
-      console.log("Bảng stations trống → lấy dữ liệu lần đầu...");
-      await updateAQIData();
-    }
-  } catch (err) {
-    console.error("Lỗi kiểm tra bảng:", err.message);
+  // Lấy dữ liệu lần đầu nếu trống
+  const { rows } = await pool.query("SELECT COUNT(*) FROM stations");
+  if (parseInt(rows[0].count) === 0) {
+    console.log("Bảng trống → Lấy dữ liệu lần đầu...");
+    await updateAQIData();
   }
 
-  // Cron cập nhật mỗi 30 phút + dọn rác
+  // Cron cập nhật + dọn rác
   cron.schedule("0,30 * * * *", async () => {
     const now = new Date().toLocaleString("vi-VN", {
       timeZone: "Asia/Ho_Chi_Minh",
@@ -218,17 +208,16 @@ app.listen(PORT, async () => {
     await updateAQIData();
 
     const { rowCount } = await pool.query(`
-      DELETE FROM station_history 
-      WHERE recorded_at < NOW() - INTERVAL '12 days'
+      DELETE FROM station_history WHERE recorded_at < NOW() - INTERVAL '12 days'
     `);
     if (rowCount > 0) console.log(`Đã xóa ${rowCount} bản ghi cũ`);
   });
 
-  // Anti sleep Render
+  // Anti-sleep
   setInterval(() => {
     fetch("https://hanoi-aqi.onrender.com/api/stations").catch(() => {});
   }, 10 * 60 * 1000);
 
-  console.log("\nHỆ THỐNG AQI HOẠT ĐỘNG AN TOÀN!");
+  console.log("\nHOÀN TẤT! HỆ THỐNG AQI HÀ NỘI ĐÃ HOẠT ĐỘNG HOÀN HẢO");
   console.log("Link: https://hanoi-aqi.onrender.com\n");
 });
