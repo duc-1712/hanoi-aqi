@@ -10,7 +10,7 @@ const markersLayer = L.layerGroup().addTo(map);
 let chartInstances = {};
 let currentStationName = "";
 
-// --- MÀU AQI ---
+// --- MÀU AQI CHUẨN ---
 function getAQIColor(aqi) {
   if (!aqi || aqi < 5) return "#94a3b8";
   if (aqi <= 50) return "#00e400";
@@ -21,10 +21,21 @@ function getAQIColor(aqi) {
   return "#7e0023";
 }
 
-// --- BIỂU ĐỒ LINE (chỉ dùng cho hourly) ---
+function getAQIClass(aqi) {
+  if (!aqi || aqi < 5) return "";
+  if (aqi <= 50) return "aqi-good";
+  if (aqi <= 100) return "aqi-moderate";
+  if (aqi <= 150) return "aqi-unhealthy";
+  if (aqi <= 200) return "aqi-bad";
+  if (aqi <= 300) return "aqi-verybad";
+  return "aqi-hazardous";
+}
+
+// --- VẼ BIỂU ĐỒ LINE (HOURLY)
 function renderLineChart(domId, title, color, labels, values) {
   const dom = document.getElementById(domId);
   if (!dom) return;
+
   if (chartInstances[domId]) chartInstances[domId].dispose();
 
   const chart = echarts.init(dom);
@@ -51,13 +62,17 @@ function renderLineChart(domId, title, color, labels, values) {
       },
     ],
   });
-  window.addEventListener("resize", () => chart.resize());
+
+  const resizeHandler = () => chart.resize();
+  window.removeEventListener("resize", resizeHandler);
+  window.addEventListener("resize", resizeHandler);
 }
 
-// --- BIỂU ĐỒ CỘT AQI THEO NGÀY – ĐẸP Y HỆT AQICN.ORG ---
+// --- VẼ BIỂU ĐỒ CỘT AQI THEO NGÀY
 function renderDailyAQIChart(labels, values) {
   const dom = document.getElementById("chart-daily-aqi");
   if (!dom) return;
+
   if (chartInstances["daily-aqi"]) chartInstances["daily-aqi"].dispose();
 
   const chart = echarts.init(dom);
@@ -109,17 +124,75 @@ function renderDailyAQIChart(labels, values) {
     ],
   });
 
-  window.addEventListener("resize", () => chart.resize());
+  const resizeHandler = () => chart.resize();
+  window.removeEventListener("resize", resizeHandler);
+  window.addEventListener("resize", resizeHandler);
 }
 
-// --- LOAD TRẠM, CHỌN TRẠM, TAB... (giữ nguyên như cũ) ---
+// --- LOAD TRẠM ---
 async function loadStations() {
-  /* giữ nguyên */
-}
-async function selectStation(st) {
-  /* giữ nguyên */
+  const list = document.getElementById("station-list");
+  try {
+    const res = await fetch(API_URL);
+    const stations = await res.json();
+
+    list.innerHTML = "";
+    markersLayer.clearLayers();
+
+    stations.forEach((st) => {
+      if (!st.aqi || st.aqi < 5) return;
+
+      const color = getAQIColor(st.aqi);
+      const aqiClass = getAQIClass(st.aqi);
+
+      const li = document.createElement("li");
+      li.className = `station-card ${aqiClass}`;
+      li.innerHTML = `<div class="st-name">${st.name}</div><div class="st-aqi">${st.aqi}</div>`;
+      li.onclick = () => selectStation(st);
+      list.appendChild(li);
+
+      const marker = L.circleMarker([st.lat, st.lon], {
+        radius: 13,
+        weight: 3,
+        color: "#fff",
+        fillColor: color,
+        fillOpacity: 0.95,
+      }).addTo(markersLayer);
+
+      marker.bindPopup(
+        `<div style="text-align:center;font-family:system-ui"><b>${st.name}</b><br><span style="font-size:28px;font-weight:900;color:${color}">AQI ${st.aqi}</span></div>`
+      );
+      marker.on("click", () => selectStation(st));
+    });
+  } catch (err) {
+    list.innerHTML =
+      "<li class='loading' style='color:red'>Lỗi tải dữ liệu</li>";
+  }
 }
 
+// --- CHỌN TRẠM ---
+async function selectStation(st) {
+  currentStationName = st.name;
+
+  document.getElementById("chart-instruction").classList.add("hidden");
+  document.getElementById("charts-wrapper").classList.remove("hidden");
+  document.getElementById("selected-station-name").textContent = st.name;
+  document.getElementById("current-stats").classList.remove("hidden");
+
+  ["aqi", "pm25", "pm10", "no2", "co", "so2", "o3"].forEach((k) => {
+    const el = document.getElementById(`val-${k}`);
+    el.textContent = st[k] ?? "--";
+    if (k === "aqi") el.style.color = getAQIColor(st[k]);
+  });
+
+  map.flyTo([st.lat, st.lon], 15);
+
+  const isDaily =
+    document.querySelector(".tab-btn.active")?.dataset.tab === "daily";
+  isDaily ? loadDailyHistory(st.name) : loadHourlyHistory(st.name);
+}
+
+// --- LOAD DỮ LIỆU GIỜ & NGÀY ---
 async function loadHourlyHistory(name) {
   try {
     const res = await fetch(
@@ -127,6 +200,7 @@ async function loadHourlyHistory(name) {
     );
     const d = await res.json();
     if (!d.times?.length) return;
+
     renderLineChart("chart-pm25", "PM2.5", "#3b82f6", d.times, d.pm25);
     renderLineChart("chart-pm10", "PM10", "#10b981", d.times, d.pm10);
     renderLineChart("chart-no2", "NO₂", "#f59e0b", d.times, d.no2);
@@ -134,7 +208,7 @@ async function loadHourlyHistory(name) {
     renderLineChart("chart-o3", "O₃", "#8b5cf6", d.times, d.o3);
     renderLineChart("chart-so2", "SO₂", "#6366f1", d.times, d.so2);
   } catch (err) {
-    console.error(err);
+    console.error("Lỗi hourly:", err);
   }
 }
 
@@ -145,13 +219,13 @@ async function loadDailyHistory(name) {
     );
     const d = await res.json();
     if (!d.dates?.length) return;
-    renderDailyAQIChart(d.dates, d.aqi); // CHỈ VẼ 1 BIỂU ĐỒ NÀY
+    renderDailyAQIChart(d.dates, d.aqi);
   } catch (err) {
-    console.error(err);
+    console.error("Lỗi daily:", err);
   }
 }
 
-// Chuyển tab
+// --- CHUYỂN TAB ---
 document.addEventListener("click", (e) => {
   if (!e.target.matches(".tab-btn")) return;
   document
@@ -170,9 +244,16 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// Khởi động
+// --- DỌN DẸP KHI ĐÓNG TRANG ---
+window.addEventListener("beforeunload", () => {
+  Object.values(chartInstances).forEach((c) => c.dispose());
+  chartInstances = {};
+});
+
+// --- KHỞI ĐỘNG ---
 loadStations();
 setInterval(loadStations, 5 * 60 * 1000);
+
 document.getElementById("toggle-sidebar").addEventListener("click", () => {
   document.getElementById("sidebar").classList.toggle("hidden");
   setTimeout(() => map.invalidateSize(), 300);
