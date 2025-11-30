@@ -5,21 +5,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Giám sát chất lượng không khí Hà Nội</title>
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <!-- FontAwesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
 </head>
 
 <body>
   <header>
     <div class="header-content">
-      <h1><i class="fa-solid fa-wind"></i> Hệ thống giám sát chất lượng không khí Hà Nội</h1>
+      <h1>Chất lượng không khí Hà Nội</h1>
       <button id="toggle-sidebar" title="Ẩn/Hiện danh sách"><i class="fa-solid fa-bars"></i></button>
     </div>
   </header>
@@ -27,85 +24,124 @@
   <div id="top-container">
     <aside id="sidebar">
       <div class="sidebar-header">
-        <h2><i class="fa-solid fa-location-dot"></i> Các trạm quan trắc</h2>
+        <h2>Các trạm quan trắc</h2>
       </div>
-
       <div class="list-wrapper">
         <ul id="station-list">
-          <li class="loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải dữ liệu...</li>
+          <li class="loading">Đang tải dữ liệu...</li>
         </ul>
       </div>
-
       <div class="legend-box">
-        <h3><i class="fa-solid fa-palette"></i> Thang màu AQI</h3>
+        <h3>Thang màu AQI</h3>
         <div class="legend-grid">
-          <div class="legend-item"><span class="dot" style="background:#00e400"></span> Tốt (0–50)</div>
-          <div class="legend-item"><span class="dot" style="background:#ffff00"></span> Trung bình (51–100)</div>
-          <div class="legend-item"><span class="dot" style="background:#ff7e00"></span> Kém (101–150)</div>
-          <div class="legend-item"><span class="dot" style="background:#ff0000"></span> Xấu (151–200)</div>
-          <div class="legend-item"><span class="dot" style="background:#8f3f97"></span> Rất xấu (201–300)</div>
-          <div class="legend-item"><span class="dot" style="background:#7e0023"></span> Nguy hại (301+)</div>
+          <div><span class="dot" style="background:#00e400"></span> Tốt (0–50)</div>
+          <div><span class="dot" style="background:#ffff00"></span> Trung bình (51–100)</div>
+          <div><span class="dot" style="background:#ff7e00"></span> Kém (101–150)</div>
+          <div><span class="dot" style="background:#ff0000"></span> Xấu (151–200)</div>
+          <div><span class="dot" style="background:#8f3f97"></span> Rất xấu (201–300)</div>
+          <div><span class="dot" style="background:#7e0023"></span> Nguy hại (301+)</div>
         </div>
       </div>
     </aside>
-
     <main id="map"></main>
   </div>
 
   <div id="bottom-container">
     <div class="container-wrapper">
-
-      <!-- CỘT 1: BIỂU ĐỒ LỊCH SỬ -->
       <div class="chart-section">
         <div class="section-header">
-          <h3 id="chart-title"><i class="fa-solid fa-chart-line"></i> Lịch sử quan trắc</h3>
+          <h3>Lịch sử quan trắc</h3>
           <span id="selected-station-name" class="badge">Chưa chọn trạm</span>
         </div>
 
         <div id="chart-instruction">
-          <i class="fa-solid fa-hand-pointer fa-2x"></i>
-          <p>Vui lòng chọn một trạm trên bản đồ để xem chi tiết.</p>
+          <p>Chọn một trạm trên bản đồ để xem chi tiết</p>
         </div>
 
         <div id="charts-wrapper" class="hidden">
-          <!-- Các biểu đồ con -->
-          <div class="chart-row">
-            <div class="chart-card">
-              <h4>PM2.5 (Bụi mịn)</h4>
-              <div id="chart-pm25" class="chart-canvas"></div>
+          <div class="tab-buttons">
+            <button class="tab-btn active" data-tab="hourly">Hằng giờ</button>
+            <button class="tab-btn" data-tab="daily">Hằng ngày</button>
+          </div>
+
+          <!-- Tab Hằng giờ -->
+          <div id="tab-hourly" class="tab-content active">
+            <div class="chart-row">
+              <div class="chart-card">
+                <h4>PM2.5</h4>
+                <div id="chart-pm25" class="chart-canvas"></div>
+              </div>
+              <div class="chart-card">
+                <h4>PM10</h4>
+                <div id="chart-pm10" class="chart-canvas"></div>
+              </div>
             </div>
-            <div class="chart-card">
-              <h4>PM10 (Bụi)</h4>
-              <div id="chart-pm10" class="chart-canvas"></div>
+            <div class="chart-row">
+              <div class="chart-card">
+                <h4>NO₂</h4>
+                <div id="chart-no2" class="chart-canvas"></div>
+              </div>
+              <div class="chart-card">
+                <h4>CO</h4>
+                <div id="chart-co" class="chart-canvas"></div>
+              </div>
+            </div>
+            <div class="chart-row">
+              <div class="chart-card">
+                <h4>O₃</h4>
+                <div id="chart-o3" class="chart-canvas"></div>
+              </div>
+              <div class="chart-card">
+                <h4>SO₂</h4>
+                <div id="chart-so2" class="chart-canvas"></div>
+              </div>
             </div>
           </div>
-          <div class="chart-row">
-            <div class="chart-card">
-              <h4>NO₂ (Nitơ Đioxit)</h4>
-              <div id="chart-no2" class="chart-canvas"></div>
+
+          <!-- Tab Hằng ngày -->
+          <div id="tab-daily" class="tab-content">
+            <div class="daily-aqi-wrapper">
+              <h4 style="text-align:center;margin:0 0 15px;color:#333;font-weight:600;">
+                AQI trung bình theo ngày
+              </h4>
+              <div id="chart-daily-aqi" style="height:340px;"></div>
             </div>
-            <div class="chart-card">
-              <h4>CO (Cacbon Monoxit)</h4>
-              <div id="chart-co" class="chart-canvas"></div>
+            <div class="chart-row" style="margin-top:15px;">
+              <div class="chart-card">
+                <h4>PM2.5 (24h)</h4>
+                <div id="daily-pm25" class="chart-canvas"></div>
+              </div>
+              <div class="chart-card">
+                <h4>PM10 (24h)</h4>
+                <div id="daily-pm10" class="chart-canvas"></div>
+              </div>
             </div>
-          </div>
-          <!-- Thêm O3 và SO2 -->
-          <div class="chart-row">
-            <div class="chart-card">
-              <h4>O₃ (Ozone)</h4>
-              <div id="chart-o3" class="chart-canvas"></div>
+            <div class="chart-row">
+              <div class="chart-card">
+                <h4>NO₂ (24h)</h4>
+                <div id="daily-no2" class="chart-canvas"></div>
+              </div>
+              <div class="chart-card">
+                <h4>CO (24h)</h4>
+                <div id="daily-co" class="chart-canvas"></div>
+              </div>
             </div>
-            <div class="chart-card">
-              <h4>SO₂ (Lưu huỳnh Đioxit)</h4>
-              <div id="chart-so2" class="chart-canvas"></div>
+            <div class="chart-row">
+              <div class="chart-card">
+                <h4>O₃ (24h)</h4>
+                <div id="daily-o3" class="chart-canvas"></div>
+              </div>
+              <div class="chart-card">
+                <h4>SO₂ (24h)</h4>
+                <div id="daily-so2" class="chart-canvas"></div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- CỘT 2: BẢNG GIÁ TRỊ -->
       <div class="table-section">
-        <h3><i class="fa-solid fa-circle-info"></i> Giá trị giới hạn (QCVN 05:2013)</h3>
+        <h3>Giá trị giới hạn (QCVN 05:2023)</h3>
         <p class="unit-label">Đơn vị: µg/m³</p>
         <table class="standard-table">
           <thead>
@@ -157,23 +193,17 @@
         </table>
         <p class="note">(*): Dấu (-) là không quy định.</p>
 
-        <!-- Thêm phần hiển thị thông số hiện tại -->
         <div id="current-stats" class="hidden">
-          <h3 style="margin-top: 20px; border-top: 1px dashed #ddd; padding-top: 15px;">
-            <i class="fa-solid fa-clock"></i> Chỉ số hiện tại
+          <h3 style="margin:20px 0 10px;border-top:1px dashed #ddd;padding-top:15px;">
+            Chỉ số hiện tại
           </h3>
           <div class="stat-grid">
-            <div class="stat-item"><span class="stat-label">AQI</span><span class="stat-val" id="val-aqi">--</span>
-            </div>
-            <div class="stat-item"><span class="stat-label">PM2.5</span><span class="stat-val" id="val-pm25">--</span>
-            </div>
-            <div class="stat-item"><span class="stat-label">PM10</span><span class="stat-val" id="val-pm10">--</span>
-            </div>
-            <div class="stat-item"><span class="stat-label">NO₂</span><span class="stat-val" id="val-no2">--</span>
-            </div>
-            <div class="stat-item"><span class="stat-label">CO</span><span class="stat-val" id="val-co">--</span></div>
-            <div class="stat-item"><span class="stat-label">SO₂</span><span class="stat-val" id="val-so2">--</span>
-            </div>
+            <div><span>AQI</span><strong id="val-aqi">--</strong></div>
+            <div><span>PM2.5</span><strong id="val-pm25">--</strong></div>
+            <div><span>PM10</span><strong id="val-pm10">--</strong></div>
+            <div><span>NO₂</span><strong id="val-no2">--</strong></div>
+            <div><span>CO</span><strong id="val-co">--</strong></div>
+            <div><span>SO₂</span><strong id="val-so2">--</strong></div>
           </div>
         </div>
       </div>
@@ -181,7 +211,7 @@
   </div>
 
   <footer>
-    <p>Nguồn dữ liệu: <a href="https://aqicn.org/" target="_blank">AQICN API</a> &copy; 2025</p>
+    <p>Nguồn: <a href="https://aqicn.org" target="_blank">AQICN</a> • Cập nhật mỗi 30 phút</p>
   </footer>
 
   <script src="script.js" defer></script>
