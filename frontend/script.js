@@ -188,8 +188,10 @@ async function selectStation(st) {
 
   ["aqi", "pm25", "pm10", "no2", "co", "so2", "o3"].forEach((k) => {
     const el = document.getElementById(`val-${k}`);
-    el.textContent = st[k] ?? "--";
-    if (k === "aqi") el.style.color = getAQIColor(st[k]);
+    if (el) {
+      el.textContent = st[k] !== null && st[k] !== undefined ? st[k] : "--";
+      if (k === "aqi") el.style.color = getAQIColor(st[k]);
+    }
   });
 
   map.flyTo([st.lat, st.lon], 16, { duration: 1.5 });
@@ -212,7 +214,7 @@ async function selectStation(st) {
   isDaily ? loadDailyHistory(st.name) : loadHourlyHistory(st.name);
 }
 
-// --- LOAD DỮ LIỆU – ĐÃ SỬA: KHÔNG CẮT DỮ LIỆU NỮA ---
+// --- LOAD DỮ LIỆU hằng giờ ---
 async function loadHourlyHistory(name) {
   try {
     const res = await fetch(
@@ -237,12 +239,20 @@ async function loadDailyHistory(name) {
     const res = await fetch(
       `${HISTORY_API_URL}?name=${encodeURIComponent(name)}&mode=daily`
     );
+    // KIỂM TRA STATUS
+    if (!res.ok) {
+      console.error("Lỗi HTTP:", res.status, res.statusText);
+      renderDailyAQIChart([], []);
+      return;
+    }
+
     const d = await res.json();
 
-    // KHÔNG CẮT DỮ LIỆU NỮA → ĐỂ HÀM VẼ TỰ XỬ LÝ
+    console.log("Daily data từ backend:", d);
+
     renderDailyAQIChart(d.dates || [], d.aqi || []);
   } catch (err) {
-    console.error("Lỗi daily:", err);
+    console.error("Lỗi fetch daily:", err);
     renderDailyAQIChart([], []);
   }
 }
