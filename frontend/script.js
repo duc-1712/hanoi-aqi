@@ -31,11 +31,10 @@ function getAQIClass(aqi) {
   return "aqi-hazardous";
 }
 
-// --- VẼ BIỂU ĐỒ LINE (HOURLY)
+// --- VẼ BIỂU ĐỒ LINE (HOURLY) ---
 function renderLineChart(domId, title, color, labels, values) {
   const dom = document.getElementById(domId);
   if (!dom) return;
-
   if (chartInstances[domId]) chartInstances[domId].dispose();
 
   const chart = echarts.init(dom);
@@ -68,7 +67,7 @@ function renderLineChart(domId, title, color, labels, values) {
   window.addEventListener("resize", resizeHandler);
 }
 
-// --- VẼ BIỂU ĐỒ CỘT AQI THEO NGÀY
+// --- VẼ BIỂU ĐỒ CỘT AQI THEO NGÀY ---
 function renderDailyAQIChart(labels, values) {
   const dom = document.getElementById("chart-daily-aqi");
   if (!dom) return;
@@ -78,12 +77,17 @@ function renderDailyAQIChart(labels, values) {
   const chart = echarts.init(dom);
   chartInstances["daily-aqi"] = chart;
 
+  const maxDays = 7;
+  const startIndex = Math.max(0, labels.length - maxDays);
+  const slicedLabels = labels.slice(startIndex);
+  const slicedValues = values.slice(startIndex);
+
   chart.setOption({
-    tooltip: { trigger: "axis", formatter: "<b>AQI {c}</b>" },
+    tooltip: { trigger: "axis", formatter: "<b>AQI {c}</b><br/>{b}" },
     grid: { top: 50, bottom: 80, left: 60, right: 70 },
     xAxis: {
       type: "category",
-      data: labels,
+      data: slicedLabels,
       axisLabel: { fontSize: 13, fontWeight: "600", color: "#444" },
     },
     yAxis: {
@@ -108,9 +112,9 @@ function renderDailyAQIChart(labels, values) {
     series: [
       {
         type: "bar",
-        barWidth: "60%",
-        data: values.map((v) => ({
-          value: v,
+        barWidth: "65%",
+        data: slicedValues.map((v, i) => ({
+          value: v || 0,
           itemStyle: { color: getAQIColor(v) },
         })),
         label: {
@@ -119,6 +123,10 @@ function renderDailyAQIChart(labels, values) {
           fontSize: 16,
           fontWeight: "bold",
           color: "#333",
+          formatter: (params) => (params.value > 0 ? params.value : ""),
+        },
+        emphasis: {
+          itemStyle: { shadowBlur: 10, shadowColor: "rgba(0,0,0,0.3)" },
         },
       },
     ],
@@ -170,7 +178,7 @@ async function loadStations() {
   }
 }
 
-// --- CHỌN TRẠM ---
+// --- CHỌN TRẠM – MARKER ---
 async function selectStation(st) {
   currentStationName = st.name;
 
@@ -185,14 +193,29 @@ async function selectStation(st) {
     if (k === "aqi") el.style.color = getAQIColor(st[k]);
   });
 
-  map.flyTo([st.lat, st.lon], 15);
+  map.flyTo([st.lat, st.lon], 16, { duration: 1.5, easeLinearity: 0.25 });
+
+  setTimeout(() => {
+    const marker = markersLayer
+      .getLayers()
+      .find(
+        (m) => m.getLatLng().lat === st.lat && m.getLatLng().lng === st.lon
+      );
+    if (marker) {
+      marker.setRadius(18).setStyle({ fillOpacity: 1 });
+      setTimeout(
+        () => marker.setRadius(13).setStyle({ fillOpacity: 0.95 }),
+        400
+      );
+    }
+  }, 800);
 
   const isDaily =
     document.querySelector(".tab-btn.active")?.dataset.tab === "daily";
   isDaily ? loadDailyHistory(st.name) : loadHourlyHistory(st.name);
 }
 
-// --- LOAD DỮ LIỆU GIỜ & NGÀY ---
+// --- LOAD DỮ LIỆU ---
 async function loadHourlyHistory(name) {
   try {
     const res = await fetch(
@@ -218,8 +241,14 @@ async function loadDailyHistory(name) {
       `${HISTORY_API_URL}?name=${encodeURIComponent(name)}&mode=daily`
     );
     const d = await res.json();
-    if (!d.dates?.length) return;
-    renderDailyAQIChart(d.dates, d.aqi);
+    if (!d.dates?.length || !d.aqi?.length) return;
+
+    const maxDays = 7;
+    const startIndex = Math.max(0, d.dates.length - maxDays);
+    const dailyDates = d.dates.slice(startIndex);
+    const dailyAQI = d.aqi.slice(startIndex);
+
+    renderDailyAQIChart(dailyDates, dailyAQI); // Vẽ 7 cột hoặc ít hơn nếu DB không đủ
   } catch (err) {
     console.error("Lỗi daily:", err);
   }
@@ -244,9 +273,9 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// --- DỌN DẸP KHI ĐÓNG TRANG ---
+// --- DỌN DẸP ---
 window.addEventListener("beforeunload", () => {
-  Object.values(chartInstances).forEach((c) => c.dispose());
+  Object.values(chartInstances).forEach((c) => c && c.dispose());
   chartInstances = {};
 });
 
