@@ -43,20 +43,21 @@ app.get("/api/history", async (req, res) => {
         SELECT 
           DATE(recorded_at + INTERVAL '7 hours') AS date,
           COALESCE(ROUND(AVG(aqi)::numeric), 0)::INTEGER AS aqi,
-          ROUND(AVG(pm25), 1) AS pm25,
-          ROUND(AVG(pm10), 1) AS pm10,
-          ROUND(AVG(o3), 1) AS o3,
-          ROUND(AVG(no2), 1) AS no2,
-          ROUND(AVG(so2), 1) AS so2,
-          ROUND(AVG(co), 1) AS co
+          ROUND(AVG(pm25)::numeric, 1) AS pm25,
+          ROUND(AVG(pm10)::numeric, 1) AS pm10,
+          ROUND(AVG(o3)::numeric, 1) AS o3,
+          ROUND(AVG(no2)::numeric, 1) AS no2,
+          ROUND(AVG(so2)::numeric, 1) AS so2,
+          ROUND(AVG(co)::numeric, 1) AS co
         FROM station_history
         WHERE station_name = $1
+          -- <-- tên trạm
           AND recorded_at >= NOW() - INTERVAL '10 days'
           AND aqi IS NOT NULL
         GROUP BY DATE(recorded_at + INTERVAL '7 hours')
         ORDER BY date DESC
         LIMIT 7
-      `,
+        `,
         [name]
       );
 
