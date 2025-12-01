@@ -42,7 +42,7 @@ app.get("/api/history", async (req, res) => {
         `
         SELECT 
           DATE(recorded_at + INTERVAL '7 hours') AS date,
-          COALESCE(ROUND(AVG(aqi)), 0)::INTEGER AS aqi,
+          COALESCE(ROUND(AVG(aqi)::numeric), 0)::INTEGER AS aqi,
           ROUND(AVG(pm25), 1) AS pm25,
           ROUND(AVG(pm10), 1) AS pm10,
           ROUND(AVG(o3), 1) AS o3,
