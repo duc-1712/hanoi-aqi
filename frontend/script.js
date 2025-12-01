@@ -68,7 +68,7 @@ function renderLineChart(domId, title, color, labels, values) {
 }
 
 // --- VẼ BIỂU ĐỒ CỘT AQI THEO NGÀY ---
-function renderDailyAQIChart(labels, values) {
+function renderDailyAQIChart(labels = [], values = []) {
   const dom = document.getElementById("chart-daily-aqi");
   if (!dom) return;
 
@@ -77,18 +77,25 @@ function renderDailyAQIChart(labels, values) {
   const chart = echarts.init(dom);
   chartInstances["daily-aqi"] = chart;
 
-  const maxDays = 7;
-  const startIndex = Math.max(0, labels.length - maxDays);
-  const slicedLabels = labels.slice(startIndex);
-  const slicedValues = values.slice(startIndex);
+  // Nếu không có dữ liệu → để trống
+  if (!labels.length || !values.length) {
+    chart.clear();
+    return;
+  }
 
   chart.setOption({
     tooltip: { trigger: "axis", formatter: "<b>AQI {c}</b><br/>{b}" },
-    grid: { top: 50, bottom: 80, left: 60, right: 70 },
+    grid: { top: 60, bottom: 80, left: 60, right: 60 },
     xAxis: {
       type: "category",
-      data: slicedLabels,
-      axisLabel: { fontSize: 13, fontWeight: "600", color: "#444" },
+      data: labels,
+      axisLabel: {
+        fontSize: 14,
+        fontWeight: "bold",
+        color: "#333",
+        interval: 0,
+        rotate: labels.length > 5 ? 25 : 0,
+      },
     },
     yAxis: {
       type: "value",
@@ -98,35 +105,24 @@ function renderDailyAQIChart(labels, values) {
       axisLabel: { fontSize: 12 },
       splitLine: { lineStyle: { color: "#eee" } },
     },
-    visualMap: {
-      show: false,
-      pieces: [
-        { min: 0, max: 50, color: "#00e400" },
-        { min: 51, max: 100, color: "#ffff00" },
-        { min: 101, max: 150, color: "#ff7e00" },
-        { min: 151, max: 200, color: "#ff0000" },
-        { min: 201, max: 300, color: "#8f3f97" },
-        { min: 301, max: 999, color: "#7e0023" },
-      ],
-    },
     series: [
       {
         type: "bar",
-        barWidth: "65%",
-        data: slicedValues.map((v, i) => ({
+        barWidth: "70%",
+        data: values.map((v) => ({
           value: v || 0,
           itemStyle: { color: getAQIColor(v) },
         })),
         label: {
           show: true,
           position: "top",
-          fontSize: 16,
+          fontSize: 18,
           fontWeight: "bold",
-          color: "#333",
-          formatter: (params) => (params.value > 0 ? params.value : ""),
+          color: "#222",
+          formatter: "{c}",
         },
         emphasis: {
-          itemStyle: { shadowBlur: 10, shadowColor: "rgba(0,0,0,0.3)" },
+          itemStyle: { shadowBlur: 15, shadowColor: "rgba(0,0,0,0.3)" },
         },
       },
     ],
@@ -168,17 +164,20 @@ async function loadStations() {
       }).addTo(markersLayer);
 
       marker.bindPopup(
-        `<div style="text-align:center;font-family:system-ui"><b>${st.name}</b><br><span style="font-size:28px;font-weight:900;color:${color}">AQI ${st.aqi}</span></div>`
+        `<div style="text-align:center;font-family:system-ui">
+          <b>${st.name}</b><br>
+          <span style="font-size:28px;font-weight:900;color:${color}">AQI ${st.aqi}</span>
+        </div>`
       );
       marker.on("click", () => selectStation(st));
     });
   } catch (err) {
     list.innerHTML =
-      "<li class='loading' style='color:red'>Lỗi tải dữ liệu</li>";
+      "<li style='color:red;padding:20px'>Lỗi tải dữ liệu trạm</li>";
   }
 }
 
-// --- CHỌN TRẠM – MARKER ---
+// --- CHỌN TRẠM ---
 async function selectStation(st) {
   currentStationName = st.name;
 
@@ -193,8 +192,9 @@ async function selectStation(st) {
     if (k === "aqi") el.style.color = getAQIColor(st[k]);
   });
 
-  map.flyTo([st.lat, st.lon], 16, { duration: 1.5, easeLinearity: 0.25 });
+  map.flyTo([st.lat, st.lon], 16, { duration: 1.5 });
 
+  // Hiệu ứng marker nhảy
   setTimeout(() => {
     const marker = markersLayer
       .getLayers()
@@ -202,20 +202,17 @@ async function selectStation(st) {
         (m) => m.getLatLng().lat === st.lat && m.getLatLng().lng === st.lon
       );
     if (marker) {
-      marker.setRadius(18).setStyle({ fillOpacity: 1 });
-      setTimeout(
-        () => marker.setRadius(13).setStyle({ fillOpacity: 0.95 }),
-        400
-      );
+      marker.setRadius(20);
+      setTimeout(() => marker.setRadius(13), 300);
     }
-  }, 800);
+  }, 600);
 
   const isDaily =
     document.querySelector(".tab-btn.active")?.dataset.tab === "daily";
   isDaily ? loadDailyHistory(st.name) : loadHourlyHistory(st.name);
 }
 
-// --- LOAD DỮ LIỆU ---
+// --- LOAD DỮ LIỆU – ĐÃ SỬA: KHÔNG CẮT DỮ LIỆU NỮA ---
 async function loadHourlyHistory(name) {
   try {
     const res = await fetch(
@@ -241,16 +238,12 @@ async function loadDailyHistory(name) {
       `${HISTORY_API_URL}?name=${encodeURIComponent(name)}&mode=daily`
     );
     const d = await res.json();
-    if (!d.dates?.length || !d.aqi?.length) return;
 
-    const maxDays = 7;
-    const startIndex = Math.max(0, d.dates.length - maxDays);
-    const dailyDates = d.dates.slice(startIndex);
-    const dailyAQI = d.aqi.slice(startIndex);
-
-    renderDailyAQIChart(dailyDates, dailyAQI); // Vẽ 7 cột hoặc ít hơn nếu DB không đủ
+    // KHÔNG CẮT DỮ LIỆU NỮA → ĐỂ HÀM VẼ TỰ XỬ LÝ
+    renderDailyAQIChart(d.dates || [], d.aqi || []);
   } catch (err) {
     console.error("Lỗi daily:", err);
+    renderDailyAQIChart([], []);
   }
 }
 
@@ -275,7 +268,7 @@ document.addEventListener("click", (e) => {
 
 // --- DỌN DẸP ---
 window.addEventListener("beforeunload", () => {
-  Object.values(chartInstances).forEach((c) => c && c.dispose());
+  Object.values(chartInstances).forEach((c) => c?.dispose());
   chartInstances = {};
 });
 
@@ -287,3 +280,8 @@ document.getElementById("toggle-sidebar").addEventListener("click", () => {
   document.getElementById("sidebar").classList.toggle("hidden");
   setTimeout(() => map.invalidateSize(), 300);
 });
+// --- AUTO SELECT FIRST STATION AFTER LOAD ---
+setTimeout(() => {
+  const firstStation = document.querySelector(".station-card");
+  if (firstStation) firstStation.click();
+}, 2000);
