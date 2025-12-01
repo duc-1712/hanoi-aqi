@@ -1,7 +1,6 @@
 -- 1. Xóa bảng cũ để cập nhật cấu trúc mới
 DROP TABLE IF EXISTS station_history;
 DROP TABLE IF EXISTS stations;
-DROP TABLE IF EXISTS hanoi_archive;
 -- 2. Tạo bảng Trạm (Thêm các cột chi tiết)
 CREATE TABLE stations (
     id SERIAL PRIMARY KEY,
@@ -35,15 +34,3 @@ CREATE TABLE station_history (
     recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_history_name_time ON station_history(station_name, recorded_at);
--- 4. Tạo bảng Lưu trữ Lịch sử Hà Nội (Từ CSV)
-CREATE TABLE hanoi_archive (
-    id SERIAL PRIMARY KEY,
-    record_date DATE UNIQUE NOT NULL,
-    pm25 REAL,
-    pm10 REAL,
-    o3 REAL,
-    no2 REAL,
-    so2 REAL,
-    co REAL
-);
-CREATE INDEX idx_archive_date ON hanoi_archive(record_date);

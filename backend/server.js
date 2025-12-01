@@ -61,6 +61,7 @@ app.get("/api/history", async (req, res) => {
       );
 
       const reversed = rows.reverse();
+
       const dates = reversed.map((r) => {
         const d = new Date(r.date);
         return `${String(d.getDate()).padStart(2, "0")}/${String(
@@ -69,7 +70,7 @@ app.get("/api/history", async (req, res) => {
       });
 
       res.json({
-        dates: dates.length ? dates : ["01/12", "30/11", "29/11"],
+        dates: dates,
         aqi: reversed.map((r) => r.aqi ?? 0),
         pm25: reversed.map((r) => r.pm25 ?? null),
         pm10: reversed.map((r) => r.pm10 ?? null),
@@ -80,7 +81,7 @@ app.get("/api/history", async (req, res) => {
       });
     }
 
-    // HOURLY MODE – NHANH HƠN 10 LẦN, KHÔNG TRỐNG!
+    // HOURLY MODE
     else {
       const { rows } = await pool.query(
         `
