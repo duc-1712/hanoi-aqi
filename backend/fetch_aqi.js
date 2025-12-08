@@ -109,6 +109,7 @@ async function saveStation(station, data, now) {
     [
       station.name,
       aqi,
+      station.uid,
       pm25,
       pm10,
       o3,
@@ -125,10 +126,20 @@ async function saveStation(station, data, now) {
 // Lưu history
 async function saveHistory(name, data, now) {
   const { aqi, pm25, pm10, o3, no2, so2, co } = data || {};
+
+  // LẤY UID TỪ BẢNG stations ĐỂ ĐIỀN VÀO station_uid
+  const { rows } = await pool.query(
+    `SELECT uid FROM stations WHERE name = $1`,
+    [name]
+  );
+
+  const station_uid = rows[0]?.uid || null;
+
   await pool.query(
-    `INSERT INTO station_history (station_name, aqi, pm25, pm10, o3, no2, so2, co, recorded_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [name, aqi, pm25, pm10, o3, no2, so2, co, now]
+    `INSERT INTO station_history 
+     (station_name, station_uid, aqi, pm25, pm10, o3, no2, so2, co, recorded_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [name, station_uid, aqi, pm25, pm10, o3, no2, so2, co, now]
   );
 }
 // fetch_aqi.js – CHẠY render
