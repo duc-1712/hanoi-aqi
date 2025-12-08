@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Test AQI Hà Nội</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial;
+        }
+
+        #map {
+            height: 100vh;
+        }
+
+        .station {
+            background: #333;
+            color: white;
+            padding: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="station">Đang tải dữ liệu AQI Hà Nội...</div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([21.0288, 105.8522], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        // DÙNG TEST DATA (hoặc đổi thành /api/stations)
+        fetch('/api/test-data')
+            .then(r => r.json())
+            .then(stations => {
+                document.querySelector('.station').innerHTML = `<strong>${stations.length} trạm đang hoạt động</strong>`;
+
+                stations.forEach(s => {
+                    const color = s.aqi <= 50 ? 'green' : s.aqi <= 100 ? 'yellow' : s.aqi <= 150 ? 'orange' : s.aqi <= 200 ? 'red' : 'purple';
+
+                    L.circleMarker([s.lat, s.lon], {
+                        radius: 12,
+                        color: 'black',
+                        weight: 2,
+                        fillColor: color,
+                        fillOpacity: 0.8
+                    }).addTo(map)
+                        .bindPopup(`
+            <b>${s.name}</b><br>
+            AQI: <strong>${s.aqi}</strong> (${s.aqi <= 50 ? 'Tốt' : s.aqi <= 100 ? 'Trung bình' : 'Xấu'})<br>
+            PM2.5: ${s.pm25} µg/m³<br>
+            Cập nhật: ${new Date(s.last_update).toLocaleTimeString('vi-VN')}
+          `);
+                });
+            });
+    </script>
+</body>
+
+</html>

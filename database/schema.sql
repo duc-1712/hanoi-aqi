@@ -66,3 +66,22 @@ CREATE INDEX idx_history_name_time ON station_history(station_name, recorded_at)
 -- ADD CONSTRAINT fk_history_uid 
 -- FOREIGN KEY (station_uid) REFERENCES stations(uid)
 -- ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE stations DROP CONSTRAINT IF EXISTS stations_uid_key;
+-- ALTER TABLE stations DROP CONSTRAINT IF EXISTS uid_unique;
+-- ALTER TABLE station_history DROP CONSTRAINT IF EXISTS fk_station_uid;
+-- ALTER TABLE station_history 
+-- ADD CONSTRAINT fk_station_uid 
+-- FOREIGN KEY (station_uid) REFERENCES stations(uid) 
+-- ON UPDATE CASCADE ON DELETE SET NULL;
+-- -- CẬP NHẬT UID (bây giờ không còn lỗi nữa)
+-- UPDATE stations SET uid = 'H8641'   WHERE name = 'Đại sứ quán Mỹ (Láng Hạ)';
+-- UPDATE stations SET uid = 'H1583'   WHERE name = 'Chi cục BVMT (Cầu Giấy)';
+-- UPDATE stations SET uid = 'H8688'   WHERE name = 'Hàng Đậu';
+-- UPDATE stations SET uid = 'H8688'   WHERE name = 'Hoàn Kiếm';
+-- UPDATE stations SET uid = 'A230626' WHERE name = 'Tây Mỗ';
+-- UPDATE stations SET uid = 'H1583'   WHERE name = 'Thành Công';
+-- UPDATE stations SET uid = 'A77074'  WHERE name = 'Minh Khai (Bắc Từ Liêm)';
+-- UPDATE stations SET uid = 'H77074'  WHERE name = 'Mỗ Lao, Hà Đông';
+-- UPDATE stations SET uid = 'A230626' WHERE name = 'Phố Nguyễn Duy Trinh';
+-- UPDATE stations SET uid = 'H8688'   WHERE name = 'DHBK Parabola (Giải Phóng)';
+-- -- === HOÀN TẤT ===

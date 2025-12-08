@@ -170,3 +170,9 @@ app.listen(PORT, async () => {
 
   console.log("HỆ THỐNG AQI HOẠT ĐỘNG HOÀN HẢO 100%!\n");
 });
+// CHẠY CẬP NHẬT AQI NGAY KHI KHỞI ĐỘNG (rất quan trọng!)
+updateAQIData()
+  .then(() => {
+    console.log("ĐÃ CHẠY CẬP NHẬT AQI NGAY LẬP TỨC!");
+  })
+  .catch((err) => console.error("Lỗi khởi động AQI:", err));
