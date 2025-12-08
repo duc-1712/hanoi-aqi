@@ -96,20 +96,29 @@ export async function updateAQIData() {
   );
 }
 
-// Lưu stations
+// LƯU STATIONS – ĐÚNG CẤU TRÚC BẢNG CỦA BẠN
 async function saveStation(station, data, now) {
   const { aqi, pm25, pm10, o3, no2, so2, co } = data || {};
+
   await pool.query(
-    `INSERT INTO stations (name, aqi, pm25, pm10, o3, no2, so2, co, lat, lon, last_update)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    `INSERT INTO stations (name, aqi, pm25, pm10, o3, no2, so2, co, lat, lon, last_update, uid)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      ON CONFLICT (name) DO UPDATE SET
-       aqi=EXCLUDED.aqi, pm25=EXCLUDED.pm25, pm10=EXCLUDED.pm10,
-       o3=EXCLUDED.o3, no2=EXCLUDED.no2, so2=EXCLUDED.so2, co=EXCLUDED.co,
-       lat=EXCLUDED.lat, lon=EXCLUDED.lon, last_update=EXCLUDED.last_update`,
+       uid = EXCLUDED.uid,
+       pm25 = EXCLUDED.pm25,
+       pm10 = EXCLUDED.pm10,
+       o3 = EXCLUDED.o3,
+       no2 = EXCLUDED.no2,
+       so2 = EXCLUDED.so2,
+       co = EXCLUDED.co,
+       lat = EXCLUDED.lat,
+       lon = EXCLUDED.lon,
+       last_update = EXCLUDED.last_update,
+       aqi = EXCLUDED.aqi`,
+
     [
-      station.name,
+      station.name, // ← đúng cột uid
       aqi,
-      station.uid,
       pm25,
       pm10,
       o3,
@@ -119,15 +128,16 @@ async function saveStation(station, data, now) {
       station.lat,
       station.lon,
       now,
+      station.uid,
     ]
   );
 }
 
-// Lưu history
+// LƯU HISTORY – ĐÚNG CẤU TRÚC BẢNG CỦA BẠN
 async function saveHistory(name, data, now) {
   const { aqi, pm25, pm10, o3, no2, so2, co } = data || {};
 
-  // LẤY UID TỪ BẢNG stations ĐỂ ĐIỀN VÀO station_uid
+  // Lấy uid từ bảng stations
   const { rows } = await pool.query(
     `SELECT uid FROM stations WHERE name = $1`,
     [name]
@@ -137,9 +147,9 @@ async function saveHistory(name, data, now) {
 
   await pool.query(
     `INSERT INTO station_history 
-     (station_name, station_uid, aqi, pm25, pm10, o3, no2, so2, co, recorded_at)
+     (station_name, aqi, pm25, pm10, o3, no2, so2, co, recorded_at, station_uid)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [name, station_uid, aqi, pm25, pm10, o3, no2, so2, co, now]
+    [name, aqi, pm25, pm10, o3, no2, so2, co, now, station_uid]
   );
 }
 // fetch_aqi.js – CHẠY render
