@@ -213,5 +213,5 @@ app.listen(PORT, async () => {
 
 // Cập nhật AQI ngay khi khởi động
 updateAQIData()
-  .then(() => console.log("ĐÃ CHẠY CẬP NHẬT AQI NGAY LẬP TỨC!"))
+  .then(() => console.log("ĐÃ CHẠY CẬP NHẬT AQI "))
   .catch((err) => console.error("Lỗi khởi động AQI:", err));

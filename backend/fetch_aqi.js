@@ -10,6 +10,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const TOKEN = process.env.AQICN_TOKEN;
 
+// 6 TRẠM: 3 UID chắc + 3 GEO cho đa dạng (tọa độ cách xa để tránh aggregate trùng)
 const STATIONS = [
   {
     name: "Đại sứ quán Mỹ",
@@ -17,35 +18,42 @@ const STATIONS = [
     lat: 21.00748,
     lon: 105.80554,
     area: "Ba Đình",
-  },
+  }, // UID ổn định
   {
     name: "UNIS Hà Đông",
     uid: "8688",
     lat: 20.97444,
     lon: 105.78972,
     area: "Hà Đông",
-  },
+  }, // UID ổn định
   {
-    name: "Mỗ Lao (AirNet)",
-    uid: "100013",
-    lat: 20.97889,
-    lon: 105.77806,
-    area: "Hà Đông",
-  }, // UID này đang hoạt động lại!
-  {
-    name: "Phạm Văn Đồng",
-    uid: "32392",
-    lat: 21.06611,
-    lon: 105.78944,
-    area: "Bắc Từ Liêm",
-  }, // UID PurpleAir chính xác
-  {
-    name: "Hoàn Kiếm (CEM)",
-    uid: "11158",
+    name: "Hoàn Kiếm (AirVisual)",
+    uid: "32391",
     lat: 21.02888,
     lon: 105.85223,
     area: "Trung tâm",
-  }, // UID CEM này vẫn còn data (hiện 189)
+  }, // UID AirVisual ổn
+  {
+    name: "Phạm Văn Đồng (Bắc)",
+    geoOnly: true,
+    lat: 21.06611,
+    lon: 105.78944,
+    area: "Bắc Từ Liêm",
+  }, // Geo cho phía Bắc
+  {
+    name: "Long Biên (Đông)",
+    geoOnly: true,
+    lat: 21.03889,
+    lon: 105.86667,
+    area: "Long Biên",
+  }, // Geo cho phía Đông
+  {
+    name: "Mỗ Lao (Nam)",
+    geoOnly: true,
+    lat: 20.97889,
+    lon: 105.77806,
+    area: "Hà Đông Nam",
+  }, // Geo cho phía Nam
 ];
 
 export async function updateAQIData() {
@@ -63,16 +71,19 @@ export async function updateAQIData() {
   let success = 0;
 
   for (const station of STATIONS) {
-    const url = `https://api.waqi.info/feed/@${station.uid}/?token=${TOKEN}`;
+    let url;
+    if (station.uid && !station.geoOnly) {
+      url = `https://api.waqi.info/feed/@${station.uid}/?token=${TOKEN}`;
+    } else {
+      url = `https://api.waqi.info/feed/geo:${station.lat};${station.lon}/?token=${TOKEN}`;
+    }
 
     try {
       const res = await fetch(url, { timeout: 12000 });
       const json = await res.json();
 
       if (json.status !== "ok" || !json.data || json.data.aqi == null) {
-        console.warn(
-          `Trạm ${station.name} (UID ${station.uid}) → không có dữ liệu`
-        );
+        console.warn(`Trạm ${station.name} → tạm thời không có dữ liệu`);
         continue;
       }
 
@@ -80,15 +91,21 @@ export async function updateAQIData() {
       const aqi = parseInt(d.aqi, 10);
       const pm25 = d.iaqi?.pm25?.v ?? null;
 
-      // 1. Đảm bảo trạm tồn tại
+      // Đảm bảo trạm tồn tại
       await pool.query(
         `INSERT INTO stations (name, uid, lat, lon, area)
          VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (name) DO UPDATE SET area = EXCLUDED.area`,
-        [station.name, station.uid, station.lat, station.lon, station.area]
+         ON CONFLICT (name) DO UPDATE SET area = EXCLUDED.area, updated_at = NOW()`,
+        [
+          station.name,
+          station.uid || null,
+          station.lat,
+          station.lon,
+          station.area,
+        ]
       );
 
-      // 2. Lưu lịch sử
+      // Lưu lịch sử
       await pool.query(
         `INSERT INTO station_history (station_id, aqi, pm25, recorded_at)
          SELECT id, $1, $2, $3 FROM stations WHERE name = $4
@@ -96,10 +113,11 @@ export async function updateAQIData() {
         [aqi, pm25, now, station.name]
       );
 
+      const source = d.city?.name || "AQICN";
       console.log(
         `ĐÃ CẬP NHẬT ${station.name.padEnd(25)} → AQI ${String(aqi).padStart(
           3
-        )} │ PM2.5 ${String(pm25 ?? "-").padStart(4)}`
+        )} │ PM2.5 ${String(pm25 ?? "-").padStart(4)} │ ${source}`
       );
       success++;
     } catch (err) {
