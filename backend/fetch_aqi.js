@@ -10,7 +10,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const TOKEN = process.env.AQICN_TOKEN;
 
-// 7 TRẠM TỐI ƯU – ĐÃ TEST 100% CÓ UID RIÊNG, KHÔNG TRÙNG
+// 7 TRẠM TỐI ƯU – 100% UID RIÊNG, KHÔNG BAO GIỜ TRÙNG
 const STATIONS = [
   {
     name: "Đại sứ quán Mỹ (Láng Hạ)",
@@ -56,10 +56,39 @@ const STATIONS = [
   },
 ];
 
-export async function updateAQIData() {
-  if (!TOKEN) return console.error("Thiếu AQICN_TOKEN trong .env");
+// TỰ ĐỘNG THÊM UID VÀO BẢNG aqi_sources NẾU CHƯA CÓ → KHÔNG BAO GIỜ LỖI FK NỮA!
+async function ensureSourceExists(uid, stationName) {
+  if (!uid) return;
+  try {
+    const { rowCount } = await pool.query(
+      "SELECT 1 FROM aqi_sources WHERE uid = $1",
+      [uid]
+    );
+    if (rowCount === 0) {
+      await pool.query(
+        "INSERT INTO aqi_sources (uid, name, source) VALUES ($1, $2, $3) ON CONFLICT (uid) DO NOTHING",
+        [uid, stationName, "aqicn"]
+      );
+      console.log(
+        `Đã tự động thêm UID ${uid} (${stationName}) vào aqi_sources`
+      );
+    }
+  } catch (err) {
+    console.error("Lỗi tự động thêm source:", err.message);
+  }
+}
 
-  console.log(`\nBắt đầu cập nhật ${STATIONS.length} trạm AQI Hà Nội...`);
+export async function updateAQIData() {
+  if (!TOKEN) {
+    console.error("Thiếu AQICN_TOKEN trong .env");
+    return;
+  }
+
+  console.log(
+    `\nBắt đầu cập nhật ${
+      STATIONS.length
+    } trạm AQI Hà Nội – ${new Date().toLocaleString("vi-VN")}`
+  );
   const now = new Date();
   let success = 0;
 
@@ -69,24 +98,24 @@ export async function updateAQIData() {
     let usedLon = station.lon;
 
     try {
-      // 1. Tìm UID chính xác bằng keyword (sẽ thành công 100% với 7 trạm này)
-      const searchUrl = `https://api.waqi.info/v2/search/?token=${TOKEN}&keyword=${encodeURIComponent(
-        station.searchKeyword
-      )}`;
-      const searchRes = await fetch(searchUrl);
+      // 1. Tìm UID bằng keyword
+      const searchRes = await fetch(
+        `https://api.waqi.info/v2/search/?token=${TOKEN}&keyword=${encodeURIComponent(
+          station.searchKeyword
+        )}`
+      );
       const searchJson = await searchRes.json();
 
       if (searchJson.status === "ok" && searchJson.data?.[0]?.uid) {
-        const result = searchJson.data[0];
-        uid = result.uid;
-        usedLat = result.geo?.[0] ?? usedLat;
-        usedLon = result.geo?.[1] ?? usedLon;
-        console.log(`Tìm thấy UID ${uid} cho ${station.name}`);
+        uid = searchJson.data[0].uid;
+        usedLat = searchJson.data[0].geo?.[0] ?? usedLat;
+        usedLon = searchJson.data[0].geo?.[1] ?? usedLon;
+        console.log(`Tìm thấy UID ${uid} → ${station.name}`);
       } else {
-        console.warn(`Không tìm thấy UID cho ${station.name} → dùng tọa độ`);
+        console.warn(`Không tìm UID → dùng tọa độ: ${station.name}`);
       }
 
-      // 2. Lấy dữ liệu chính thức bằng UID (ưu tiên) hoặc geo
+      // 2. Lấy dữ liệu chính thức
       const feedUrl = uid
         ? `https://api.waqi.info/feed/@${uid}/?token=${TOKEN}`
         : `https://api.waqi.info/feed/geo:${usedLat};${usedLon}/?token=${TOKEN}`;
@@ -112,10 +141,16 @@ export async function updateAQIData() {
         so2 = d.iaqi?.so2?.v ?? null;
         co = d.iaqi?.co?.v ?? null;
       } else {
-        console.warn(`API trả lỗi cho ${station.name}:`, feedJson);
+        console.warn(
+          `API lỗi cho ${station.name}:`,
+          feedJson.status || feedJson
+        );
       }
 
-      // Lưu DB
+      // TỰ ĐỘNG THÊM UID VÀO aqi_sources TRƯỚC KHI LƯU
+      if (uid) await ensureSourceExists(uid, station.name);
+
+      // Lưu vào DB
       await saveStation(
         station,
         { aqi, pm25, pm10, o3, no2, so2, co },
@@ -131,26 +166,32 @@ export async function updateAQIData() {
         uid
       );
 
-      console.log(
-        aqi
-          ? `OK ${station.name} → AQI ${aqi} | PM2.5: ${pm25 ?? "-"} | PM10: ${
-              pm10 ?? "-"
-            } | NO₂: ${no2 ?? "-"} [UID: ${uid || "geo"}]`
-          : `Chờ ${station.name} (không có dữ liệu)`
-      );
-      if (aqi) success++;
+      // Log đẹp
+      if (aqi !== null) {
+        console.log(
+          `OK ${station.name} → AQI ${aqi} | PM2.5 ${pm25 ?? "-"} | PM10 ${
+            pm10 ?? "-"
+          } | NO₂ ${no2 ?? "-"} [UID: ${uid || "geo"}]`
+        );
+        success++;
+      } else {
+        console.log(`Chờ dữ liệu: ${station.name}`);
+      }
     } catch (err) {
       console.error(`Lỗi nghiêm trọng ${station.name}:`, err.message);
+      // Vẫn cố lưu (null) để frontend không bị treo
       await saveStation(station, null, now, usedLat, usedLon, uid);
       await saveHistory(station.name, null, now, uid);
     }
 
-    // Delay nhẹ để không vượt rate limit (khoảng 40–50 request/phút là an toàn)
-    await new Promise((r) => setTimeout(r, 1500));
+    // Delay an toàn
+    await new Promise((r) => setTimeout(r, 1600));
   }
 
   console.log(
-    `\nHOÀN TẤT! ${success}/${STATIONS.length} trạm có AQI thành công.\n`
+    `\nHOÀN TẤT! ${success}/${
+      STATIONS.length
+    } trạm có AQI – ${new Date().toLocaleString("vi-VN")}\n`
   );
 }
 
@@ -164,7 +205,20 @@ async function saveStation(station, data, now, lat, lon, realUid) {
        aqi=EXCLUDED.aqi, pm25=EXCLUDED.pm25, pm10=EXCLUDED.pm10,
        o3=EXCLUDED.o3, no2=EXCLUDED.no2, so2=EXCLUDED.so2, co=EXCLUDED.co,
        lat=EXCLUDED.lat, lon=EXCLUDED.lon, last_update=EXCLUDED.last_update, uid=EXCLUDED.uid`,
-    [station.name, aqi, pm25, pm10, o3, no2, so2, co, lat, lon, now, realUid]
+    [
+      station.name,
+      aqi,
+      pm25,
+      pm10,
+      o3,
+      no2,
+      so2,
+      co,
+      lat,
+      lon,
+      now,
+      realUid || null,
+    ]
   );
 }
 
@@ -174,6 +228,6 @@ async function saveHistory(name, data, now, station_uid) {
   await pool.query(
     `INSERT INTO station_history (station_name, aqi, pm25, pm10, o3, no2, so2, co, recorded_at, station_uid)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-    [name, aqi, pm25, pm10, o3, no2, so2, co, now, station_uid]
+    [name, aqi, pm25, pm10, o3, no2, so2, co, now, station_uid || null]
   );
 }
