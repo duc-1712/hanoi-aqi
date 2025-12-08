@@ -1,3 +1,4 @@
+// fetch_aqi.js – ĐÃ SỬA LỖI "inconsistent types" – CHẠY NGON 100% TRÊN RENDER
 import fetch from "node-fetch";
 import { pool } from "./db.js";
 import dotenv from "dotenv";
@@ -52,6 +53,7 @@ export async function updateAQIData() {
       let res = await fetch(url, { timeout: 12000 });
       let json = await res.json();
 
+      // Fallback geo nếu UID không có data
       if (json.status !== "ok" || !json.data || json.data.aqi == null) {
         console.warn(
           `UID ${station.uid} (${station.name}) → dùng geo fallback`
@@ -74,28 +76,35 @@ export async function updateAQIData() {
       const no2 = d.iaqi?.no2?.v ?? null;
       const so2 = d.iaqi?.so2?.v ?? null;
       const co = d.iaqi?.co?.v ?? null;
-      // LƯU VÀO DB
-      // 1. Lưu thông tin trạm vào stations
+
+      // BƯỚC 1: Đảm bảo trạm tồn tại trong bảng stations (chỉ lưu thông tin cố định)
       await pool.query(
-        `INSERT INTO stations (name, uid, lat, lon, area)
-         VALUES ($1, $2, $3, $4,
-           CASE
-             WHEN $1 LIKE '%Hoàn Kiếm%' THEN 'Trung tâm'
-             WHEN $1 LIKE '%Hàng Đậu%' THEN 'Phía Bắc'
-             WHEN $1 LIKE '%Đại sứ quán Mỹ%' THEN 'Ba Đình - Đống Đa'
-             WHEN $1 LIKE '%Thành Công%' THEN 'Ba Đình'
-             WHEN $1 LIKE '%Cầu Giấy%' THEN 'Cầu Giấy'
-             WHEN $1 LIKE '%Tây Mỗ%' THEN 'Nam Từ Liêm'
-             WHEN $1 LIKE '%Minh Khai%' THEN 'Bắc Từ Liêm'
-             WHEN $1 LIKE '%UNIS%' THEN 'Hà Đông'
-             ELSE 'Khác'
-           END)
-         ON CONFLICT (name) DO UPDATE 
-         SET updated_at = NOW()`,
+        `INSERT INTO stations (name, uid, lat, lon)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (name) DO NOTHING`,
         [station.name, station.uid, station.lat, station.lon]
       );
 
-      // 2. Lưu dữ liệu realtime vào station_history
+      // BƯỚC 2: Cập nhật area tự động (chạy riêng để tránh lỗi type)
+      await pool.query(
+        `UPDATE stations 
+         SET area = CASE
+           WHEN name LIKE '%Hoàn Kiếm%' THEN 'Trung tâm'
+           WHEN name LIKE '%Hàng Đậu%' THEN 'Phía Bắc'
+           WHEN name LIKE '%Đại sứ quán Mỹ%' THEN 'Ba Đình - Đống Đa'
+           WHEN name LIKE '%Thành Công%' THEN 'Ba Đình'
+           WHEN name LIKE '%Cầu Giấy%' THEN 'Cầu Giấy'
+           WHEN name LIKE '%Tây Mỗ%' THEN 'Nam Từ Liêm'
+           WHEN name LIKE '%Minh Khai%' THEN 'Bắc Từ Liêm'
+           WHEN name LIKE '%UNIS%' THEN 'Hà Đông'
+           ELSE 'Khác'
+         END,
+         updated_at = NOW()
+         WHERE name = $1`,
+        [station.name]
+      );
+
+      // BƯỚC 3: Lưu dữ liệu AQI vào lịch sử
       await pool.query(
         `INSERT INTO station_history (station_id, aqi, pm25, pm10, o3, no2, so2, co, recorded_at)
          SELECT id, $1, $2, $3, $4, $5, $6, $7, $8
