@@ -31,7 +31,7 @@ app.get("/api/stations", async (req, res) => {
         h.co,
         s.lat,
         s.lon,
-        h.recorded_at AS last_update
+        h.recorded_at AT TIME ZONE 'Asia/Ho_Chi_Minh' AS last_update
       FROM stations s
       LEFT JOIN LATERAL (
         SELECT aqi, pm25, pm10, o3, no2, so2, co, recorded_at
