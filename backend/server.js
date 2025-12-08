@@ -15,7 +15,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "../frontend")));
 
 // =============================
-// API STATIONS – ĐÃ SỬA ĐÚNG DB MỚI
+// API STATIONS
 // =============================
 app.get("/api/stations", async (req, res) => {
   try {
@@ -54,7 +54,7 @@ app.get("/api/stations", async (req, res) => {
 });
 
 // =============================
-// API HISTORY – ĐÃ SỬA ĐÚNG DB MỚI (dùng station_id)
+// API HISTORY
 // =============================
 app.get("/api/history", async (req, res) => {
   const { name, mode } = req.query;
@@ -177,12 +177,13 @@ app.get("*", (req, res) => {
 });
 
 // =============================
-// KHỞI ĐỘNG SERVER
+// KHỞI ĐỘNG SERVER & CRON JOB
 // =============================
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, async () => {
   console.log(`\nSERVER CHẠY THÀNH CÔNG TẠI https://hanoi-aqi.onrender.com\n`);
 
+  // 1. Kiểm tra kết nối DB
   try {
     await pool.query("SELECT 1");
     console.log("DB kết nối OK");
@@ -191,76 +192,50 @@ app.listen(PORT, async () => {
     process.exit(1);
   }
 
-  // Cron: Cập nhật mỗi 30 phút + dọn lịch sử cũ
-
-  // =============================
-  // KHỞI ĐỘNG SERVER & CRON JOB
-  // =============================
-  const PORT = process.env.PORT || 10000;
-  app.listen(PORT, async () => {
+  // 2. Định nghĩa hàm cập nhật (để dùng lại)
+  const performUpdate = async (isManual = false) => {
+    const nowVN = new Date().toLocaleString("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+    });
     console.log(
-      `\nSERVER CHẠY THÀNH CÔNG TẠI https://hanoi-aqi.onrender.com\n`
+      `\n[${
+        isManual ? "KHỞI ĐỘNG" : "CRON JOB"
+      }] Bắt đầu cập nhật AQI - ${nowVN}`
     );
 
-    // 1. Kiểm tra kết nối DB
     try {
-      await pool.query("SELECT 1");
-      console.log("DB kết nối OK");
-    } catch (err) {
-      console.error("DB lỗi:", err.message);
-      process.exit(1);
-    }
-
-    // 2. Định nghĩa hàm cập nhật (để dùng lại)
-    const performUpdate = async (isManual = false) => {
-      const nowVN = new Date().toLocaleString("vi-VN", {
-        timeZone: "Asia/Ho_Chi_Minh",
-      });
-      console.log(
-        `\n[${
-          isManual ? "KHỞI ĐỘNG" : "CRON JOB"
-        }] Bắt đầu cập nhật AQI - ${nowVN}`
+      await updateAQIData();
+      // Xóa dữ liệu cũ hơn 12 ngày để nhẹ DB
+      await pool.query(
+        `DELETE FROM station_history WHERE recorded_at < NOW() - INTERVAL '12 days'`
       );
+      console.log(`-> Cập nhật thành công lúc ${nowVN}`);
+    } catch (err) {
+      console.error("-> Lỗi cập nhật:", err.message);
+    }
+  };
 
-      try {
-        await updateAQIData();
-        // Xóa dữ liệu cũ hơn 12 ngày để nhẹ DB
-        await pool.query(
-          `DELETE FROM station_history WHERE recorded_at < NOW() - INTERVAL '12 days'`
-        );
-        console.log(`-> Cập nhật thành công lúc ${nowVN}`);
-      } catch (err) {
-        console.error("-> Lỗi cập nhật:", err.message);
-      }
-    };
+  // 3. Thiết lập Cron Job (Chạy vào phút 00 và 30 mỗi giờ)
+  cron.schedule(
+    "0,30 * * * *",
+    () => performUpdate(false), // false = chạy tự động
+    {
+      scheduled: true,
+      timezone: "Asia/Ho_Chi_Minh",
+    }
+  );
 
-    // 3. Thiết lập Cron Job (Chạy vào phút 00 và 30 mỗi giờ)
-    // Lưu ý: Cron sẽ tự tính toán thời gian tiếp theo, không cần setTimeout thủ công
-    cron.schedule(
-      "0,30 * * * *",
-      () => performUpdate(false), // false = chạy tự động
-      {
-        scheduled: true,
-        timezone: "Asia/Ho_Chi_Minh",
-      }
-    );
+  // 4. QUAN TRỌNG: Chạy cập nhật NGAY LẬP TỨC khi server vừa bật
+  console.log("Đang lấy dữ liệu lần đầu tiên ngay lập tức...");
+  await performUpdate(true); // true = chạy thủ công lúc boot
 
-    // 4. QUAN TRỌNG: Chạy cập nhật NGAY LẬP TỨC khi server vừa bật
-    // Không chờ đến phút 00 hay 30, lấy dữ liệu ngay để web có cái hiển thị luôn
-    console.log("Đang lấy dữ liệu lần đầu tiên ngay lập tức...");
-    await performUpdate(true); // true = chạy thủ công lúc boot
+  console.log(
+    "\nHỆ THỐNG ĐÃ SẴN SÀNG! Dữ liệu đã được cập nhật và lịch trình Cron đã được thiết lập.\n"
+  );
 
-    console.log(
-      "\nHỆ THỐNG ĐÃ SẴN SÀNG! Dữ liệu đã được cập nhật và lịch trình Cron đã được thiết lập.\n"
-    );
-
-    // Keep-alive (để Render không ngủ nếu dùng gói free, ping mỗi 10p)
-    setInterval(
-      () =>
-        fetch("https://hanoi-aqi.onrender.com/api/stations").catch(() => {}),
-      600000
-    );
-  });
-
-  console.log("HỆ THỐNG AQI HOẠT ĐỘNG HOÀN HẢO 100%!\n");
+  // Keep-alive (để Render không ngủ nếu dùng gói free, ping mỗi 10p)
+  setInterval(
+    () => fetch("https://hanoi-aqi.onrender.com/api/stations").catch(() => {}),
+    600000
+  );
 });
