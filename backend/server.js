@@ -192,17 +192,98 @@ app.listen(PORT, async () => {
   }
 
   // Cron: Cập nhật mỗi 30 phút + dọn lịch sử cũ
-  cron.schedule("0,30 * * * *", async () => {
-    console.log(
-      `\n[Cron] Cập nhật AQI - ${new Date().toLocaleString("vi-VN")}`
-    );
-    await updateAQIData();
-    await pool.query(
-      `DELETE FROM station_history WHERE recorded_at < NOW() - INTERVAL '12 days'`
-    );
-  });
 
-  // Keep-alive cho Render
+  // Hàm tính delay đến lần 00 hoặc 30 gần nhất (theo giờ Việt Nam)
+  function getDelayToNextHalfHourVN() {
+    const now = new Date();
+    const vnOffset = 7 * 60 * 60 * 1000; // UTC+7
+    const nowVN = new Date(now.getTime() + vnOffset);
+
+    const currentHours = nowVN.getHours();
+    const currentMinutes = nowVN.getMinutes();
+
+    let targetHours = currentHours;
+    let targetMinutes = 30;
+
+    if (currentMinutes >= 30) {
+      targetMinutes = 0;
+      targetHours += 1;
+      if (targetHours >= 24) {
+        targetHours = 0;
+      }
+    }
+
+    // Tạo thời điểm mục tiêu theo giờ Việt Nam
+    const targetVN = new Date(nowVN);
+    targetVN.setHours(targetHours, targetMinutes, 0, 0);
+
+    // Chuyển về thời gian thực của server (UTC) để tính delay
+    const targetUTC = new Date(targetVN.getTime() - vnOffset);
+
+    const delay = targetUTC.getTime() - now.getTime();
+    return delay > 0 ? delay : 10000; // nếu đã qua thì chạy luôn sau 10 giây
+  }
+
+  // =============== CHẠY LẦN ĐẦU TIÊN ĐÚNG 3H30 HOẶC GẦN NHẤT (GIỜ VN) ===============
+  const initialDelay = getDelayToNextHalfHourVN();
+  const nextRunTime = new Date(Date.now() + initialDelay);
+
+  console.log(`\nServer khởi động lúc: ${new Date().toLocaleString("vi-VN")}`);
+  console.log(
+    `Lần cập nhật AQI kế tiếp: ${nextRunTime.toLocaleString("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+    })} (giờ Việt Nam)`
+  );
+  console.log(
+    `Còn khoảng ${Math.round(initialDelay / 60000)} phút nữa sẽ chạy...\n`
+  );
+
+  setTimeout(async () => {
+    const nowVN = new Date().toLocaleString("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+    });
+    console.log(`\n[CẬP NHẬT ĐẦU TIÊN] Bắt đầu lấy dữ liệu AQI - ${nowVN}`);
+
+    try {
+      await updateAQIData();
+      await pool.query(
+        `DELETE FROM station_history WHERE recorded_at < NOW() - INTERVAL '12 days'`
+      );
+      console.log("Cập nhật AQI lần đầu thành công!");
+    } catch (err) {
+      console.error("Lỗi khi cập nhật AQI lần đầu:", err.message);
+    }
+
+    // =============== SAU LẦN ĐẦU → CHẠY ĐỊNH KỲ MÃI MÃI THEO GIỜ VIỆT NAM ===============
+    cron.schedule(
+      "0,30 * * * *",
+      async () => {
+        const nowVN = new Date().toLocaleString("vi-VN", {
+          timeZone: "Asia/Ho_Chi_Minh",
+        });
+        console.log(`\n[Cron định kỳ] Cập nhật AQI - ${nowVN}`);
+
+        try {
+          await updateAQIData();
+          await pool.query(
+            `DELETE FROM station_history WHERE recorded_at < NOW() - INTERVAL '12 days'`
+          );
+          console.log("Cập nhật định kỳ thành công!");
+        } catch (err) {
+          console.error("Lỗi cron định kỳ:", err.message);
+        }
+      },
+      {
+        scheduled: true,
+        timezone: "Asia/Ho_Chi_Minh", // Quan trọng: ép cron chạy theo giờ Việt Nam
+      }
+    );
+
+    console.log(
+      "ĐÃ ĐỒNG BỘ HOÀN TOÀN! Từ giờ trở đi sẽ cập nhật đúng phút 00 và 30 mỗi giờ (giờ Việt Nam).\n"
+    );
+  }, initialDelay);
+
   setInterval(
     () => fetch("https://hanoi-aqi.onrender.com/api/stations").catch(() => {}),
     600000
@@ -210,8 +291,3 @@ app.listen(PORT, async () => {
 
   console.log("HỆ THỐNG AQI HOẠT ĐỘNG HOÀN HẢO 100%!\n");
 });
-
-// Cập nhật AQI ngay khi khởi động
-updateAQIData()
-  .then(() => console.log("ĐÃ CHẠY CẬP NHẬT AQI "))
-  .catch((err) => console.error("Lỗi khởi động AQI:", err));
