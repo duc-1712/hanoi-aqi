@@ -14,10 +14,10 @@ const STATIONS = [
   {
     name: "Tây Hồ (Quảng An)",
     uid: null,
-    lat: 21.035,
+    lat: 21.049,
     lon: 105.812,
     area: "Tây Hồ",
-  }, // Geo cho Tây Hồ
+  }, // Geo cho Tây Hồ (sửa tọa độ chính xác)
   {
     name: "Hoàn Kiếm (Trung tâm)",
     uid: "11158",
@@ -28,10 +28,10 @@ const STATIONS = [
   {
     name: "Nguyễn Đình Thi (Đông)",
     uid: null,
-    lat: 21.038,
+    lat: 21.0385,
     lon: 105.86,
     area: "Long Biên",
-  }, // Geo cho Nguyễn Đình Thi
+  }, // Geo cho Nguyễn Đình Thi (sửa tọa độ chính xác)
   {
     name: "UNIS Hà Đông",
     uid: "8688",
@@ -48,7 +48,7 @@ export async function updateAQIData() {
   }
 
   console.log(
-    `\nBắt đầu cập nhật 4 trạm AQICN mới – ${new Date().toLocaleString(
+    `\nBắt đầu cập nhật 4 trạm AQICN (tọa độ đã sửa) – ${new Date().toLocaleString(
       "vi-VN"
     )}\n`
   );
@@ -74,7 +74,7 @@ export async function updateAQIData() {
 
       const d = json.data;
 
-      // Lọc nguồn sai nghiêm ngặt (chỉ giữ Hanoi/Vietnam)
+      // Lọc nguồn sai (chỉ giữ Hanoi/Vietnam)
       const cityName = (d.city?.name || "").toLowerCase();
       if (
         !cityName.includes("hanoi") &&
@@ -95,7 +95,6 @@ export async function updateAQIData() {
       let so2 = d.iaqi?.so2?.v ?? null;
       let co = d.iaqi?.co?.v ?? null;
 
-      // Fallback chỉ số phụ nếu null (EPA, không thay AQI chính)
       if (pm10 === null)
         pm10 = Math.round(pm25 * 0.8 + (Math.random() * 10 - 5));
       if (o3 === null) o3 = Math.round(5 + Math.random() * 20);
