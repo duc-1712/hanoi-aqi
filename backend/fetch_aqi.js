@@ -164,4 +164,3 @@ export async function updateAQIData() {
     `\nHOÀN TẤT! ${success}/${STATIONS.length} trạm cập nhật thành công từ AQICN\n`
   );
 }
-// =============================
