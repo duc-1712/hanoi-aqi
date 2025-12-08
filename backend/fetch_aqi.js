@@ -104,7 +104,7 @@ async function saveStation(station, data, now) {
     `INSERT INTO stations (name, aqi, pm25, pm10, o3, no2, so2, co, lat, lon, last_update, uid)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      ON CONFLICT (name) DO UPDATE SET
-       uid = EXCLUDED.uid,
+       aqi = EXCLUDED.aqi,
        pm25 = EXCLUDED.pm25,
        pm10 = EXCLUDED.pm10,
        o3 = EXCLUDED.o3,
@@ -114,10 +114,11 @@ async function saveStation(station, data, now) {
        lat = EXCLUDED.lat,
        lon = EXCLUDED.lon,
        last_update = EXCLUDED.last_update,
-       aqi = EXCLUDED.aqi`,
+       uid = EXCLUDED.uid
+       `,
 
     [
-      station.name, // ← đúng cột uid
+      station.name,
       aqi,
       pm25,
       pm10,
