@@ -12,31 +12,40 @@ const TOKEN = process.env.AQICN_TOKEN;
 
 const STATIONS = [
   {
-    name: "Đại sứ quán Mỹ (Láng Hạ)",
+    name: "Đại sứ quán Mỹ",
+    uid: "6748",
     lat: 21.00748,
     lon: 105.80554,
     area: "Ba Đình",
   },
   {
-    name: "Hoàn Kiếm (Trung tâm)",
+    name: "UNIS Hà Đông",
+    uid: "8688",
+    lat: 20.97444,
+    lon: 105.78972,
+    area: "Hà Đông",
+  },
+  {
+    name: "Mỗ Lao (AirNet)",
+    uid: "100013",
+    lat: 20.97889,
+    lon: 105.77806,
+    area: "Hà Đông",
+  }, // UID này đang hoạt động lại!
+  {
+    name: "Phạm Văn Đồng",
+    uid: "32392",
+    lat: 21.06611,
+    lon: 105.78944,
+    area: "Bắc Từ Liêm",
+  }, // UID PurpleAir chính xác
+  {
+    name: "Hoàn Kiếm (CEM)",
+    uid: "11158",
     lat: 21.02888,
     lon: 105.85223,
     area: "Trung tâm",
-  },
-  {
-    name: "Hàng Đậu (Phía Bắc)",
-    lat: 21.04172,
-    lon: 105.84917,
-    area: "Long Biên",
-  },
-  {
-    name: "Thành Công (Cầu Giấy)",
-    lat: 21.01952,
-    lon: 105.81351,
-    area: "Cầu Giấy",
-  },
-  { name: "Mỗ Lao (Hà Đông)", lat: 20.97889, lon: 105.77806, area: "Hà Đông" },
-  { name: "UNIS Hà Đông", lat: 20.97444, lon: 105.78972, area: "Hà Đông Nam" },
+  }, // UID CEM này vẫn còn data (hiện 189)
 ];
 
 export async function updateAQIData() {
@@ -54,61 +63,50 @@ export async function updateAQIData() {
   let success = 0;
 
   for (const station of STATIONS) {
-    const url = `https://api.waqi.info/feed/geo:${station.lat};${station.lon}/?token=${TOKEN}`;
+    const url = `https://api.waqi.info/feed/@${station.uid}/?token=${TOKEN}`;
 
     try {
       const res = await fetch(url, { timeout: 12000 });
       const json = await res.json();
 
       if (json.status !== "ok" || !json.data || json.data.aqi == null) {
-        console.warn(`Trạm ${station.name} → không có dữ liệu`);
+        console.warn(
+          `Trạm ${station.name} (UID ${station.uid}) → không có dữ liệu`
+        );
         continue;
       }
 
       const d = json.data;
-      const aqi = d.aqi && !isNaN(d.aqi) ? parseInt(d.aqi, 10) : null;
+      const aqi = parseInt(d.aqi, 10);
       const pm25 = d.iaqi?.pm25?.v ?? null;
-      const pm10 = d.iaqi?.pm10?.v ?? null;
-      const o3 = d.iaqi?.o3?.v ?? null;
-      const no2 = d.iaqi?.no2?.v ?? null;
-      const so2 = d.iaqi?.so2?.v ?? null;
-      const co = d.iaqi?.co?.v ?? null;
 
-      // 1. Đảm bảo trạm tồn tại (với area sẵn)
+      // 1. Đảm bảo trạm tồn tại
       await pool.query(
-        `INSERT INTO stations (name, lat, lon, area)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (name) DO NOTHING`,
-        [station.name, station.lat, station.lon, station.area]
+        `INSERT INTO stations (name, uid, lat, lon, area)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (name) DO UPDATE SET area = EXCLUDED.area`,
+        [station.name, station.uid, station.lat, station.lon, station.area]
       );
 
-      // 2. Cập nhật updated_at
+      // 2. Lưu lịch sử
       await pool.query(
-        `UPDATE stations SET updated_at = NOW() WHERE name = $1`,
-        [station.name]
-      );
-
-      // 3. Lưu vào lịch sử
-      await pool.query(
-        `INSERT INTO station_history (station_id, aqi, pm25, pm10, o3, no2, so2, co, recorded_at)
-         SELECT id, $1, $2, $3, $4, $5, $6, $7, $8
-         FROM stations WHERE name = $9
+        `INSERT INTO station_history (station_id, aqi, pm25, recorded_at)
+         SELECT id, $1, $2, $3 FROM stations WHERE name = $4
          ON CONFLICT (station_id, recorded_at) DO NOTHING`,
-        [aqi, pm25, pm10, o3, no2, so2, co, now, station.name]
+        [aqi, pm25, now, station.name]
       );
 
-      const source = d.city?.name || "AQICN Geo";
       console.log(
         `ĐÃ CẬP NHẬT ${station.name.padEnd(25)} → AQI ${String(aqi).padStart(
           3
-        )} │ PM2.5 ${String(pm25 ?? "-").padStart(4)} │ ${source}`
+        )} │ PM2.5 ${String(pm25 ?? "-").padStart(4)}`
       );
       success++;
     } catch (err) {
       console.error(`Lỗi ${station.name}:`, err.message);
     }
 
-    await new Promise((r) => setTimeout(r, 1350));
+    await new Promise((r) => setTimeout(r, 1400));
   }
 
   console.log(
