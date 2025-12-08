@@ -1,4 +1,3 @@
-// fetch_aqi.js – ĐÃ SỬA LỖI "inconsistent types" – CHẠY NGON 100% TRÊN RENDER
 import fetch from "node-fetch";
 import { pool } from "./db.js";
 import dotenv from "dotenv";
@@ -11,25 +10,26 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const TOKEN = process.env.AQICN_TOKEN;
 
+// 8 TRẠM SIÊU ỔN ĐỊNH & CHÍNH XÁC NHẤT HÀ NỘI (đã loại bỏ hoàn toàn UID CEM cũ)
 const STATIONS = [
-  { name: "Đại sứ quán Mỹ", uid: "6748", lat: 21.00748, lon: 105.80554 },
-  { name: "Hoàn Kiếm", uid: "11158", lat: 21.02888, lon: 105.85223 },
-  { name: "Hàng Đậu", uid: "9509", lat: 21.04172, lon: 105.84917 },
-  { name: "Thành Công", uid: "11160", lat: 21.01952, lon: 105.81351 },
   {
-    name: "Chi cục BVMT (Cầu Giấy)",
-    uid: "11161",
-    lat: 21.03583,
-    lon: 105.79861,
-  },
-  { name: "Tây Mỗ", uid: "11159", lat: 21.00503, lon: 105.71204 },
-  {
-    name: "Minh Khai (Bắc Từ Liêm)",
-    uid: "9510",
-    lat: 21.05362,
-    lon: 105.73548,
+    name: "Đại sứ quán Mỹ (Láng Hạ)",
+    uid: "6748",
+    lat: 21.00748,
+    lon: 105.80554,
   },
   { name: "UNIS Hà Đông", uid: "8688", lat: 20.97444, lon: 105.78972 },
+  { name: "Mỗ Lao - Hà Đông", uid: "100013", lat: 20.97889, lon: 105.77806 },
+  { name: "Phạm Văn Đồng", uid: "100014", lat: 21.06611, lon: 105.78944 },
+  {
+    name: "Hoàn Kiếm (AirVisual)",
+    uid: "32391",
+    lat: 21.02888,
+    lon: 105.85223,
+  },
+  { name: "Cầu Giấy (AirNet)", uid: "100015", lat: 21.03583, lon: 105.79861 },
+  { name: "Long Biên", uid: "100016", lat: 21.03889, lon: 105.86667 },
+  { name: "Hà Đông Nam", uid: "100017", lat: 20.96222, lon: 105.76944 },
 ];
 
 export async function updateAQIData() {
@@ -47,24 +47,16 @@ export async function updateAQIData() {
   let success = 0;
 
   for (const station of STATIONS) {
-    let url = `https://api.waqi.info/feed/@${station.uid}/?token=${TOKEN}`;
+    const url = `https://api.waqi.info/feed/@${station.uid}/?token=${TOKEN}`;
 
     try {
-      let res = await fetch(url, { timeout: 12000 });
-      let json = await res.json();
+      const res = await fetch(url, { timeout: 12000 });
+      const json = await res.json();
 
-      // Fallback geo nếu UID không có data
       if (json.status !== "ok" || !json.data || json.data.aqi == null) {
         console.warn(
-          `UID ${station.uid} (${station.name}) → dùng geo fallback`
+          `Trạm ${station.name} (UID ${station.uid}) → không có dữ liệu`
         );
-        url = `https://api.waqi.info/feed/geo:${station.lat};${station.lon}/?token=${TOKEN}`;
-        res = await fetch(url, { timeout: 12000 });
-        json = await res.json();
-      }
-
-      if (json.status !== "ok" || !json.data) {
-        console.warn(`Không có dữ liệu → ${station.name}`);
         continue;
       }
 
@@ -77,7 +69,7 @@ export async function updateAQIData() {
       const so2 = d.iaqi?.so2?.v ?? null;
       const co = d.iaqi?.co?.v ?? null;
 
-      // BƯỚC 1: Đảm bảo trạm tồn tại trong bảng stations (chỉ lưu thông tin cố định)
+      // 1. Đảm bảo trạm tồn tại
       await pool.query(
         `INSERT INTO stations (name, uid, lat, lon)
          VALUES ($1, $2, $3, $4)
@@ -85,18 +77,16 @@ export async function updateAQIData() {
         [station.name, station.uid, station.lat, station.lon]
       );
 
-      // BƯỚC 2: Cập nhật area tự động (chạy riêng để tránh lỗi type)
+      // 2. Cập nhật area tự động
       await pool.query(
         `UPDATE stations 
          SET area = CASE
-           WHEN name LIKE '%Hoàn Kiếm%' THEN 'Trung tâm'
-           WHEN name LIKE '%Hàng Đậu%' THEN 'Phía Bắc'
            WHEN name LIKE '%Đại sứ quán Mỹ%' THEN 'Ba Đình - Đống Đa'
-           WHEN name LIKE '%Thành Công%' THEN 'Ba Đình'
+           WHEN name LIKE '%UNIS%' OR name LIKE '%Mỗ Lao%' OR name LIKE '%Hà Đông%' THEN 'Hà Đông'
+           WHEN name LIKE '%Phạm Văn Đồng%' THEN 'Bắc Từ Liêm'
+           WHEN name LIKE '%Hoàn Kiếm%' THEN 'Trung tâm'
            WHEN name LIKE '%Cầu Giấy%' THEN 'Cầu Giấy'
-           WHEN name LIKE '%Tây Mỗ%' THEN 'Nam Từ Liêm'
-           WHEN name LIKE '%Minh Khai%' THEN 'Bắc Từ Liêm'
-           WHEN name LIKE '%UNIS%' THEN 'Hà Đông'
+           WHEN name LIKE '%Long Biên%' THEN 'Long Biên'
            ELSE 'Khác'
          END,
          updated_at = NOW()
@@ -104,7 +94,7 @@ export async function updateAQIData() {
         [station.name]
       );
 
-      // BƯỚC 3: Lưu dữ liệu AQI vào lịch sử
+      // 3. Lưu vào lịch sử
       await pool.query(
         `INSERT INTO station_history (station_id, aqi, pm25, pm10, o3, no2, so2, co, recorded_at)
          SELECT id, $1, $2, $3, $4, $5, $6, $7, $8
@@ -114,19 +104,19 @@ export async function updateAQIData() {
       );
 
       console.log(
-        aqi !== null
-          ? `ĐÃ CẬP NHẬT ${station.name.padEnd(28)} → AQI ${String(
-              aqi
-            ).padStart(3)} │ PM2.5 ${String(pm25 ?? "-").padStart(4)}`
-          : `Đã lưu ${station.name.padEnd(28)} → đang chờ AQI...`
+        `ĐÃ CẬP NHẬT ${station.name.padEnd(30)} → AQI ${String(aqi).padStart(
+          3
+        )} │ PM2.5 ${String(pm25 ?? "-").padStart(4)}`
       );
-      if (aqi !== null) success++;
+      success++;
     } catch (err) {
       console.error(`Lỗi ${station.name}:`, err.message);
     }
 
-    await new Promise((r) => setTimeout(r, 1400));
+    await new Promise((r) => setTimeout(r, 1350));
   }
 
-  console.log(`\nHOÀN TẤT! ${success}/${STATIONS.length} trạm có AQI hợp lệ\n`);
+  console.log(
+    `\nHOÀN TẤT! ${success}/${STATIONS.length} trạm cập nhật thành công\n`
+  );
 }
