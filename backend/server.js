@@ -31,7 +31,8 @@ app.get("/api/stations", async (req, res) => {
         h.co,
         s.lat,
         s.lon,
-        h.recorded_at AT TIME ZONE 'Asia/Ho_Chi_Minh' AS last_update
+        
+        h.recorded_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh' AS last_update
       FROM stations s
       LEFT JOIN LATERAL (
         SELECT aqi, pm25, pm10, o3, no2, so2, co, recorded_at
@@ -54,7 +55,7 @@ app.get("/api/stations", async (req, res) => {
 });
 
 // =============================
-// API HISTORY
+// API HISTORY (ĐÃ FIX LỖI MÚI GIỜ)
 // =============================
 app.get("/api/history", async (req, res) => {
   const { name, mode } = req.query;
@@ -76,7 +77,8 @@ app.get("/api/history", async (req, res) => {
       const { rows } = await pool.query(
         `
         SELECT 
-          DATE(recorded_at AT TIME ZONE 'Asia/Ho_Chi_Minh') AS date,
+          -- FIX: Chuyển UTC -> VN rồi mới lấy DATE
+          DATE(recorded_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh') AS date,
           COALESCE(ROUND(AVG(aqi)::numeric), 0)::INTEGER AS aqi,
           ROUND(AVG(pm25)::numeric, 1) AS pm25,
           ROUND(AVG(pm10)::numeric, 1) AS pm10,
@@ -88,7 +90,8 @@ app.get("/api/history", async (req, res) => {
         WHERE station_id = $1
           AND recorded_at >= NOW() - INTERVAL '10 days'
           AND aqi IS NOT NULL
-        GROUP BY DATE(recorded_at AT TIME ZONE 'Asia/Ho_Chi_Minh')
+        -- FIX: Group by cũng phải theo giờ VN
+        GROUP BY DATE(recorded_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh')
         ORDER BY date DESC
         LIMIT 7
         `,
@@ -120,7 +123,8 @@ app.get("/api/history", async (req, res) => {
       const { rows } = await pool.query(
         `
         SELECT 
-          recorded_at AT TIME ZONE 'Asia/Ho_Chi_Minh' AS local_time,
+          -- FIX: Chuyển UTC -> VN
+          recorded_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh' AS local_time,
           aqi, pm25, pm10, o3, no2, so2, co
         FROM station_history
         WHERE station_id = $1
