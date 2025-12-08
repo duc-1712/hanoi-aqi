@@ -1,157 +1,183 @@
-// fetch_aqi.js – KẾT HỢP AQICN + OPENAQ ĐỂ LẤY DỮ LIỆU AQI CHO HÀ NỘI
-
+// fetch_aqi.js – KẾT HỢP AQICN + OPENAQ → 6 TRẠM ĐẦY ĐỦ 6 CHỈ SỐ (PM2.5, PM10, O₃, NO₂, SO₂, CO)
 import fetch from "node-fetch";
 import { pool } from "./db.js";
-import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+const AQICN_TOKEN = process.env.AQICN_TOKEN;
 
-const TOKEN = process.env.AQICN_TOKEN;
-
-// Hàm tính AQI từ PM2.5 (EPA) – dùng cho OpenAQ
-function calculateAQI(pm25) {
-  if (pm25 <= 12) return Math.round((50 / 12) * pm25);
-  if (pm25 <= 35.4) return Math.round(50 + (pm25 - 12) * (50 / 23.4));
-  if (pm25 <= 55.4) return Math.round(100 + (pm25 - 35.5) * (50 / 19.9));
-  if (pm25 <= 150.4) return Math.round(150 + (pm25 - 55.5) * (50 / 94.9));
-  if (pm25 <= 250.4) return Math.round(200 + (pm25 - 150.5) * (100 / 99.9));
-  return Math.round(300 + (pm25 - 250.5) * (200 / 249.5));
-}
+const STATIONS = [
+  {
+    name: "Nguyễn Duy Trinh",
+    uid: "44334",
+    lat: 20.9625,
+    lon: 105.7694,
+    area: "Hà Đông",
+  },
+  {
+    name: "UNIS Hà Nội",
+    uid: "8688",
+    lat: 20.97444,
+    lon: 105.78972,
+    area: "Hà Đông",
+  },
+  {
+    name: "Hoàn Kiếm",
+    uid: "11158",
+    lat: 21.02888,
+    lon: 105.85223,
+    area: "Hoàn Kiếm",
+  },
+  {
+    name: "Hàng Đậu",
+    uid: "9509",
+    lat: 21.04172,
+    lon: 105.84917,
+    area: "Long Biên",
+  },
+  {
+    name: "Cầu Giấy",
+    uid: "11161",
+    lat: 21.03583,
+    lon: 105.79861,
+    area: "Cầu Giấy",
+  },
+  {
+    name: "Thanh Xuân",
+    uid: "11162",
+    lat: 20.998,
+    lon: 105.81,
+    area: "Thanh Xuân",
+  },
+];
 
 export async function updateAQIData() {
-  if (!TOKEN) {
-    console.error("Thiếu AQICN_TOKEN trong .env");
-    return;
-  }
+  if (!AQICN_TOKEN) return console.error("Thiếu AQICN_TOKEN");
 
   console.log(
-    `\nBắt đầu cập nhật AQICN + OpenAQ – ${new Date().toLocaleString(
+    `\nBắt đầu cập nhật 6 trạm AQICN + OpenAQ – ${new Date().toLocaleString(
       "vi-VN"
     )}\n`
   );
   const now = new Date();
   let success = 0;
 
-  // === 1. LẤY 2 TRẠM TỪ AQICN (UNIS & Hanoi CEM) ===
-  const aqicnStations = [
-    {
-      name: "UNIS Hà Đông",
-      uid: "8688",
-      lat: 20.97444,
-      lon: 105.78972,
-      area: "Hà Đông",
-    },
-    {
-      name: "Hà Nội (CEM)",
-      uid: "H1583",
-      lat: 21.02888,
-      lon: 105.85223,
-      area: "Trung tâm",
-    },
-  ];
-
-  for (const station of aqicnStations) {
+  // 1. Lấy dữ liệu từ AQICN (AQI + PM2.5)
+  const aqicnData = {};
+  for (const station of STATIONS) {
     try {
-      let url = `https://api.waqi.info/feed/@${station.uid}/?token=${TOKEN}`;
-      let res = await fetch(url, { timeout: 12000 });
-      let json = await res.json();
+      const url = `https://api.waqi.info/feed/@${station.uid}/?token=${AQICN_TOKEN}`;
+      const res = await fetch(url, { timeout: 12000 });
+      const json = await res.json();
 
-      if (json.status !== "ok" || !json.data || json.data.aqi == null) {
-        console.warn(`AQICN ${station.name} → fallback geo`);
-        url = `https://api.waqi.info/feed/geo:${station.lat};${station.lon}/?token=${TOKEN}`;
-        res = await fetch(url, { timeout: 12000 });
-        json = await res.json();
+      if (json.status === "ok" && json.data?.aqi != null) {
+        const d = json.data;
+        aqicnData[station.name] = {
+          aqi: parseInt(d.aqi, 10),
+          pm25: d.iaqi?.pm25?.v ?? null,
+          pm10: d.iaqi?.pm10?.v ?? null,
+          o3: d.iaqi?.o3?.v ?? null,
+          no2: d.iaqi?.no2?.v ?? null,
+          so2: d.iaqi?.so2?.v ?? null,
+          co: d.iaqi?.co?.v ?? null,
+        };
       }
-
-      if (json.status !== "ok" || !json.data || json.data.aqi == null) continue;
-
-      const d = json.data;
-      const city = (d.city?.name || "").toLowerCase();
-      if (!city.includes("hanoi") && !city.includes("vietnam")) continue;
-
-      const aqi = parseInt(d.aqi, 10);
-      const pm25 = d.iaqi?.pm25?.v ?? null;
-
-      await pool.query(
-        `INSERT INTO stations (name, lat, lon, area) VALUES ($1,$2,$3,$4)
-         ON CONFLICT (name) DO UPDATE SET updated_at = NOW()`,
-        [station.name, station.lat, station.lon, station.area]
-      );
-
-      await pool.query(
-        `INSERT INTO station_history (station_id, aqi, pm25, recorded_at)
-         SELECT id, $1, $2, $3 FROM stations WHERE name = $4
-         ON CONFLICT (station_id, recorded_at) DO NOTHING`,
-        [aqi, pm25, now, station.name]
-      );
-
-      console.log(
-        `ĐÃ CẬP NHẬT ${station.name.padEnd(20)} → AQI ${aqi} │ PM2.5 ${
-          pm25 ?? "-"
-        } | Nguồn: AQICN`
-      );
-      success++;
     } catch (err) {
       console.error(`Lỗi AQICN ${station.name}:`, err.message);
     }
   }
 
-  // === 2. LẤY 4 TRẠM TỪ OPENAQ (CEM realtime) ===
+  // 2. Lấy dữ liệu từ OpenAQ (bổ sung PM10, O3, NO2, SO2, CO)
   try {
     const openaqUrl =
-      "https://api.openaq.org/v2/latest?city=Hanoi&parameter=pm25&limit=20";
+      "https://api.openaq.org/v2/latest?city=Hanoi&parameter=pm25,pm10,o3,no2,so2,co&limit=50";
     const res = await fetch(openaqUrl);
     const json = await res.json();
 
-    if (json.results && json.results.length > 0) {
-      let count = 0;
-      for (const result of json.results) {
-        if (count >= 4) break; // Chỉ lấy 4 trạm đầu
+    if (json.results) {
+      const openaqMap = {};
+      json.results.forEach((r) => {
+        if (r.coordinates) {
+          const key = `${r.coordinates.latitude.toFixed(
+            5
+          )},${r.coordinates.longitude.toFixed(5)}`;
+          openaqMap[key] = r.measurements.reduce((acc, m) => {
+            acc[m.parameter] = m.value;
+            return acc;
+          }, {});
+        }
+      });
 
-        const measurement = result.measurements.find(
-          (m) => m.parameter === "pm25"
-        );
-        if (!measurement || measurement.value == null) continue;
+      // Gán dữ liệu OpenAQ vào trạm gần nhất
+      for (const station of STATIONS) {
+        const key = `${station.lat.toFixed(5)},${station.lon.toFixed(5)}`;
+        const nearest = Object.keys(openaqMap).find((k) => {
+          const [lat, lon] = k.split(",").map(Number);
+          return (
+            Math.abs(lat - station.lat) < 0.01 &&
+            Math.abs(lon - station.lon) < 0.01
+          );
+        });
 
-        const pm25 = measurement.value;
-        const aqi = calculateAQI(pm25);
-        const name = result.location || `Trạm OpenAQ ${count + 1}`;
-        const lat = result.coordinates?.latitude;
-        const lon = result.coordinates?.longitude;
-
-        if (!lat || !lon) continue;
-
-        await pool.query(
-          `INSERT INTO stations (name, lat, lon, area) VALUES ($1,$2,$3,$4)
-           ON CONFLICT (name) DO UPDATE SET updated_at = NOW()`,
-          [name, lat, lon, "Hà Nội"]
-        );
-
-        await pool.query(
-          `INSERT INTO station_history (station_id, aqi, pm25, recorded_at)
-           SELECT id, $1, $2, $3 FROM stations WHERE name = $4
-           ON CONFLICT (station_id, recorded_at) DO NOTHING`,
-          [aqi, pm25, now, name]
-        );
-
-        console.log(
-          `ĐÃ CẬP NHẬT ${name.padEnd(20)} → AQI ${aqi} │ PM2.5 ${pm25.toFixed(
-            1
-          )} | Nguồn: OpenAQ`
-        );
-        success++;
-        count++;
+        if (nearest && openaqMap[nearest]) {
+          const data = openaqMap[nearest];
+          aqicnData[station.name] = {
+            ...aqicnData[station.name],
+            pm10: data.pm10 ?? aqicnData[station.name]?.pm10,
+            o3: data.o3 ?? aqicnData[station.name]?.o3,
+            no2: data.no2 ?? aqicnData[station.name]?.no2,
+            so2: data.so2 ?? aqicnData[station.name]?.so2,
+            co: data.co ?? aqicnData[station.name]?.co,
+          };
+        }
       }
     }
   } catch (err) {
     console.error("Lỗi OpenAQ:", err.message);
   }
 
+  // 3. Lưu vào DB
+  for (const station of STATIONS) {
+    const data = aqicnData[station.name] || {};
+    const {
+      aqi = null,
+      pm25 = null,
+      pm10 = null,
+      o3 = null,
+      no2 = null,
+      so2 = null,
+      co = null,
+    } = data;
+
+    await pool.query(
+      `INSERT INTO stations (name, lat, lon, area) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (name) DO UPDATE SET updated_at = NOW()`,
+      [station.name, station.lat, station.lon, station.area]
+    );
+
+    await pool.query(
+      `INSERT INTO station_history (station_id, aqi, pm25, pm10, o3, no2, so2, co, recorded_at)
+       SELECT id, $1,$2,$3,$4,$5,$6,$7,$8 FROM stations WHERE name = $9
+       ON CONFLICT (station_id, recorded_at) DO NOTHING`,
+      [aqi, pm25, pm10, o3, no2, so2, co, now, station.name]
+    );
+
+    console.log(
+      `ĐÃ CẬP NHẬT ${station.name.padEnd(28)} → AQI ${String(
+        aqi ?? "-"
+      ).padStart(3)} ` +
+        `│ PM2.5 ${String(pm25 ?? "-").padStart(4)} │ PM10 ${String(
+          pm10 ?? "-"
+        ).padStart(4)} ` +
+        `│ O₃ ${String(o3 ?? "-").padStart(4)} │ NO₂ ${String(
+          no2 ?? "-"
+        ).padStart(4)} ` +
+        `│ SO₂ ${String(so2 ?? "-").padStart(4)} │ CO ${String(
+          co ?? "-"
+        ).padStart(5)}`
+    );
+    if (aqi) success++;
+  }
+
   console.log(
-    `\nHOÀN TẤT! ${success} trạm cập nhật thành công (AQICN + OpenAQ)\n`
+    `\nHOÀN TẤT! ${success}/6 trạm cập nhật thành công (đầy đủ chỉ số)\n`
   );
 }
