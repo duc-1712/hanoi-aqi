@@ -34,6 +34,25 @@ const STATIONS = [
     lat: 21.05362,
     lon: 105.73548,
   },
+
+  {
+    name: "Mỗ Lao, Hà Đông",
+    uid: "100380",
+    lat: 20.97889,
+    lon: 105.77806,
+  },
+  {
+    name: "Phố Nguyễn Duy Trinh",
+    uid: "44334",
+    lat: 21.01722,
+    lon: 105.84722,
+  },
+  {
+    name: "DHBK Parabola (Giải Phóng)",
+    uid: "97684",
+    lat: 21.00694,
+    lon: 105.84306,
+  },
 ];
 
 export async function updateAQIData() {
