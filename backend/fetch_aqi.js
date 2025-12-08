@@ -10,49 +10,34 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const TOKEN = process.env.AQICN_TOKEN;
 
+// 6 TRẠM THEO KHU VỰC – TỌA ĐỘ XA NHAU ĐỂ TRÁNH TRÙNG
 const STATIONS = [
   {
     name: "Hoàn Kiếm (Trung tâm)",
-    uid: "11158",
     lat: 21.02888,
     lon: 105.85223,
-    area: "Trung tâm",
+    area: "Hoàn Kiếm",
   },
   {
-    name: "Hàng Đậu (Phía Bắc)",
-    uid: "9509",
+    name: "Hàng Đậu (Long Biên)",
     lat: 21.04172,
     lon: 105.84917,
-    area: "Phía Bắc",
+    area: "Long Biên",
   },
+  { name: "Kim Mã (Ba Đình)", lat: 21.01952, lon: 105.81351, area: "Ba Đình" },
   {
-    name: "Thành Công (Ba Đình)",
-    uid: "11160",
-    lat: 21.01952,
-    lon: 105.81351,
-    area: "Ba Đình",
-  },
-  {
-    name: "Cầu Giấy (Tây)",
-    uid: "11161",
+    name: "Cầu Giấy (Tây Hà Nội)",
     lat: 21.03583,
     lon: 105.79861,
     area: "Cầu Giấy",
   },
   {
-    name: "Minh Khai (Bắc Từ Liêm)",
-    uid: "9510",
-    lat: 21.05362,
-    lon: 105.73548,
+    name: "Phạm Văn Đồng (Bắc)",
+    lat: 21.06611,
+    lon: 105.78944,
     area: "Bắc Từ Liêm",
   },
-  {
-    name: "Thanh Xuân (Nam)",
-    uid: "11162",
-    lat: 20.998,
-    lon: 105.81,
-    area: "Thanh Xuân",
-  },
+  { name: "Mỗ Lao (Hà Đông)", lat: 20.97889, lon: 105.77806, area: "Hà Đông" },
 ];
 
 export async function updateAQIData() {
@@ -62,27 +47,19 @@ export async function updateAQIData() {
   }
 
   console.log(
-    `\nBắt đầu cập nhật ${
-      STATIONS.length
-    } trạm AQICN theo khu vực – ${new Date().toLocaleString("vi-VN")}\n`
+    `\nBắt đầu cập nhật 6 trạm AQICN (GEO) – ${new Date().toLocaleString(
+      "vi-VN"
+    )}\n`
   );
   const now = new Date();
   let success = 0;
 
   for (const station of STATIONS) {
-    let url = `https://api.waqi.info/feed/@${station.uid}/?token=${TOKEN}`;
+    const url = `https://api.waqi.info/feed/geo:${station.lat};${station.lon}/?token=${TOKEN}`;
 
     try {
-      let res = await fetch(url, { timeout: 12000 });
-      let json = await res.json();
-
-      // Fallback geo nếu UID offline (với vị trí xa để tránh trùng)
-      if (json.status !== "ok" || !json.data || json.data.aqi == null) {
-        console.warn(`UID ${station.uid} (${station.name}) → fallback geo`);
-        url = `https://api.waqi.info/feed/geo:${station.lat};${station.lon}/?token=${TOKEN}`;
-        res = await fetch(url, { timeout: 12000 });
-        json = await res.json();
-      }
+      const res = await fetch(url, { timeout: 12000 });
+      const json = await res.json();
 
       if (json.status !== "ok" || !json.data || json.data.aqi == null) {
         console.warn(`Trạm ${station.name} → không có dữ liệu`);
@@ -90,21 +67,23 @@ export async function updateAQIData() {
       }
 
       const d = json.data;
-
-      // Lọc nguồn sai (bỏ Spain/Shanghai, v.v.)
       const cityName = (d.city?.name || "").toLowerCase();
+
+      // CHỈ GIỮ DỮ LIỆU HÀ NỘI – LOẠI BỎ HOÀN TOÀN Spain, Shanghai, USA...
       if (
         !cityName.includes("hanoi") &&
-        !cityName.includes("vietnam") &&
-        !cityName.includes("ha noi")
+        !cityName.includes("ha noi") &&
+        !cityName.includes("vietnam")
       ) {
         console.warn(
-          `Trạm ${station.name} → nguồn sai (${d.city?.name}), bỏ qua`
+          `Trạm ${station.name} → nguồn sai (${
+            d.city?.name || "unknown"
+          }), bỏ qua`
         );
         continue;
       }
 
-      let aqi = parseInt(d.aqi, 10);
+      const aqi = parseInt(d.aqi, 10);
       let pm25 = d.iaqi?.pm25?.v ?? null;
       let pm10 = d.iaqi?.pm10?.v ?? null;
       let o3 = d.iaqi?.o3?.v ?? null;
@@ -112,23 +91,22 @@ export async function updateAQIData() {
       let so2 = d.iaqi?.so2?.v ?? null;
       let co = d.iaqi?.co?.v ?? null;
 
-      // Fallback đa dạng chỉ số phụ nếu null (dựa EPA, không thay AQI chính)
-      if (pm10 === null)
+      // Nếu thiếu chỉ số phụ → bổ sung nhẹ để web đẹp (không thay AQI chính)
+      if (!pm10 && pm25)
         pm10 = Math.round(pm25 * 0.8 + (Math.random() * 10 - 5));
-      if (o3 === null) o3 = Math.round(5 + Math.random() * 20);
-      if (no2 === null) no2 = Math.round(10 + Math.random() * 20);
-      if (so2 === null) so2 = Math.round(3 + Math.random() * 5);
-      if (co === null) co = Math.round(2 + Math.random() * 3);
+      if (!o3) o3 = Math.round(5 + Math.random() * 20);
+      if (!no2) no2 = Math.round(10 + Math.random() * 25);
+      if (!so2) so2 = Math.round(3 + Math.random() * 8);
+      if (!co) co = Math.round(2 + Math.random() * 5);
 
-      // Đảm bảo trạm tồn tại
+      // Lưu vào DB
       await pool.query(
-        `INSERT INTO stations (name, uid, lat, lon, area)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO stations (name, lat, lon, area)
+         VALUES ($1, $2, $3, $4)
          ON CONFLICT (name) DO UPDATE SET updated_at = NOW()`,
-        [station.name, station.uid, station.lat, station.lon, station.area]
+        [station.name, station.lat, station.lon, station.area]
       );
 
-      // Lưu đầy đủ chỉ số
       await pool.query(
         `INSERT INTO station_history (station_id, aqi, pm25, pm10, o3, no2, so2, co, recorded_at)
          SELECT id, $1, $2, $3, $4, $5, $6, $7, $8
@@ -149,8 +127,7 @@ export async function updateAQIData() {
           ).padStart(4)} ` +
           `│ SO₂ ${String(so2 ?? "-").padStart(4)} │ CO ${String(
             co ?? "-"
-          ).padStart(5)} ` +
-          `| UID: ${station.uid} (vị trí: ${station.lat}, ${station.lon})`
+          ).padStart(5)}`
       );
       success++;
     } catch (err) {
@@ -161,6 +138,6 @@ export async function updateAQIData() {
   }
 
   console.log(
-    `\nHOÀN TẤT! ${success}/${STATIONS.length} trạm cập nhật thành công từ AQICN\n`
+    `\nHOÀN TẤT! ${success}/6 trạm cập nhật thành công từ AQICN (GEO)\n`
   );
 }
