@@ -10,26 +10,33 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const TOKEN = process.env.AQICN_TOKEN;
 
-// 8 TRẠM SIÊU ỔN ĐỊNH & CHÍNH XÁC NHẤT HÀ NỘI (đã loại bỏ hoàn toàn UID CEM cũ)
 const STATIONS = [
   {
     name: "Đại sứ quán Mỹ (Láng Hạ)",
-    uid: "6748",
     lat: 21.00748,
     lon: 105.80554,
+    area: "Ba Đình",
   },
-  { name: "UNIS Hà Đông", uid: "8688", lat: 20.97444, lon: 105.78972 },
-  { name: "Mỗ Lao - Hà Đông", uid: "100013", lat: 20.97889, lon: 105.77806 },
-  { name: "Phạm Văn Đồng", uid: "100014", lat: 21.06611, lon: 105.78944 },
   {
-    name: "Hoàn Kiếm (AirVisual)",
-    uid: "32391",
+    name: "Hoàn Kiếm (Trung tâm)",
     lat: 21.02888,
     lon: 105.85223,
+    area: "Trung tâm",
   },
-  { name: "Cầu Giấy (AirNet)", uid: "100015", lat: 21.03583, lon: 105.79861 },
-  { name: "Long Biên", uid: "100016", lat: 21.03889, lon: 105.86667 },
-  { name: "Hà Đông Nam", uid: "100017", lat: 20.96222, lon: 105.76944 },
+  {
+    name: "Hàng Đậu (Phía Bắc)",
+    lat: 21.04172,
+    lon: 105.84917,
+    area: "Long Biên",
+  },
+  {
+    name: "Thành Công (Cầu Giấy)",
+    lat: 21.01952,
+    lon: 105.81351,
+    area: "Cầu Giấy",
+  },
+  { name: "Mỗ Lao (Hà Đông)", lat: 20.97889, lon: 105.77806, area: "Hà Đông" },
+  { name: "UNIS Hà Đông", lat: 20.97444, lon: 105.78972, area: "Hà Đông Nam" },
 ];
 
 export async function updateAQIData() {
@@ -47,16 +54,14 @@ export async function updateAQIData() {
   let success = 0;
 
   for (const station of STATIONS) {
-    const url = `https://api.waqi.info/feed/@${station.uid}/?token=${TOKEN}`;
+    const url = `https://api.waqi.info/feed/geo:${station.lat};${station.lon}/?token=${TOKEN}`;
 
     try {
       const res = await fetch(url, { timeout: 12000 });
       const json = await res.json();
 
       if (json.status !== "ok" || !json.data || json.data.aqi == null) {
-        console.warn(
-          `Trạm ${station.name} (UID ${station.uid}) → không có dữ liệu`
-        );
+        console.warn(`Trạm ${station.name} → không có dữ liệu`);
         continue;
       }
 
@@ -69,28 +74,17 @@ export async function updateAQIData() {
       const so2 = d.iaqi?.so2?.v ?? null;
       const co = d.iaqi?.co?.v ?? null;
 
-      // 1. Đảm bảo trạm tồn tại
+      // 1. Đảm bảo trạm tồn tại (với area sẵn)
       await pool.query(
-        `INSERT INTO stations (name, uid, lat, lon)
+        `INSERT INTO stations (name, lat, lon, area)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (name) DO NOTHING`,
-        [station.name, station.uid, station.lat, station.lon]
+        [station.name, station.lat, station.lon, station.area]
       );
 
-      // 2. Cập nhật area tự động
+      // 2. Cập nhật updated_at
       await pool.query(
-        `UPDATE stations 
-         SET area = CASE
-           WHEN name LIKE '%Đại sứ quán Mỹ%' THEN 'Ba Đình - Đống Đa'
-           WHEN name LIKE '%UNIS%' OR name LIKE '%Mỗ Lao%' OR name LIKE '%Hà Đông%' THEN 'Hà Đông'
-           WHEN name LIKE '%Phạm Văn Đồng%' THEN 'Bắc Từ Liêm'
-           WHEN name LIKE '%Hoàn Kiếm%' THEN 'Trung tâm'
-           WHEN name LIKE '%Cầu Giấy%' THEN 'Cầu Giấy'
-           WHEN name LIKE '%Long Biên%' THEN 'Long Biên'
-           ELSE 'Khác'
-         END,
-         updated_at = NOW()
-         WHERE name = $1`,
+        `UPDATE stations SET updated_at = NOW() WHERE name = $1`,
         [station.name]
       );
 
@@ -103,10 +97,11 @@ export async function updateAQIData() {
         [aqi, pm25, pm10, o3, no2, so2, co, now, station.name]
       );
 
+      const source = d.city?.name || "AQICN Geo";
       console.log(
-        `ĐÃ CẬP NHẬT ${station.name.padEnd(30)} → AQI ${String(aqi).padStart(
+        `ĐÃ CẬP NHẬT ${station.name.padEnd(25)} → AQI ${String(aqi).padStart(
           3
-        )} │ PM2.5 ${String(pm25 ?? "-").padStart(4)}`
+        )} │ PM2.5 ${String(pm25 ?? "-").padStart(4)} │ ${source}`
       );
       success++;
     } catch (err) {
