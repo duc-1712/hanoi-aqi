@@ -9,14 +9,14 @@ const STATIONS = [
     uid: "44334",
     lat: 20.9625,
     lon: 105.7694,
-    area: "Hà Đông",
+    area: "Hoàn Kiếm",
   },
   {
     name: "UNIS Hà Nội",
     uid: "8688",
     lat: 21.0811211,
     lon: 105.8180306,
-    area: "Hà Đông",
+    area: "Quận Tây Hồ/Bắc Từ Liêm",
   },
   {
     name: "Hoàn Kiếm",
@@ -30,7 +30,7 @@ const STATIONS = [
     uid: "9509",
     lat: 21.04172,
     lon: 105.84917,
-    area: "Long Biên",
+    area: "Ba Đình",
   },
   {
     name: "Cầu Giấy",
