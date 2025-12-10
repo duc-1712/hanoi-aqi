@@ -14,8 +14,8 @@ const STATIONS = [
   {
     name: "UNIS Hà Nội",
     uid: "8688",
-    lat: 20.97444,
-    lon: 105.78972,
+    lat: 21.0811211,
+    lon: 105.8180306,
     area: "Hà Đông",
   },
   {
