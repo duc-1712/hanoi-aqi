@@ -54,9 +54,7 @@ app.get("/api/stations", async (req, res) => {
   }
 });
 
-// =============================
-// API HISTORY (ĐÃ FIX LỖI MÚI GIỜ)
-// =============================
+// API HISTORY
 app.get("/api/history", async (req, res) => {
   const { name, mode } = req.query;
   if (!name) return res.status(400).json({ error: "Thiếu tên trạm" });
@@ -237,7 +235,7 @@ app.listen(PORT, async () => {
     "\nHỆ THỐNG ĐÃ SẴN SÀNG! Dữ liệu đã được cập nhật và lịch trình Cron đã được thiết lập.\n"
   );
 
-  // Keep-alive (để Render không ngủ nếu dùng gói free, ping mỗi 10p)
+  // Keep-alive (để Render không ngủ khi dùng gói free, ping mỗi 10p)
   setInterval(
     () => fetch("https://hanoi-aqi.onrender.com/api/stations").catch(() => {}),
     600000

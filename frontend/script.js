@@ -30,7 +30,51 @@ function getAQIClass(aqi) {
   if (aqi <= 300) return "aqi-verybad";
   return "aqi-hazardous";
 }
+function getAQIInfo(aqi) {
+  if (!aqi || aqi < 5)
+    return { level: "Không xác định", advice: "Chưa có dữ liệu đánh giá." };
 
+  if (aqi <= 50)
+    return {
+      level: "Tốt",
+      advice:
+        "Không khí trong lành. Bạn có thể hoạt động ngoài trời bình thường.",
+    };
+
+  if (aqi <= 100)
+    return {
+      level: "Trung bình",
+      advice:
+        "Chất lượng chấp nhận được. Nhóm nhạy cảm (người già, trẻ em, người bệnh phổi) nên cân nhắc giảm vận động mạnh ngoài trời.",
+    };
+
+  if (aqi <= 150)
+    return {
+      level: "Kém",
+      advice:
+        "Nhóm nhạy cảm cần hạn chế ra ngoài. Mọi người nên giảm vận động mạnh khi ở ngoài trời.",
+    };
+
+  if (aqi <= 200)
+    return {
+      level: "Xấu",
+      advice:
+        "Có hại cho sức khỏe. Mọi người nên hạn chế ra ngoài. Bắt buộc đeo khẩu trang chống bụi mịn khi ra đường.",
+    };
+
+  if (aqi <= 300)
+    return {
+      level: "Rất xấu",
+      advice:
+        "Cảnh báo khẩn cấp! Người dân nên ở trong nhà, đóng cửa sổ. Tránh mọi hoạt động ngoài trời.",
+    };
+
+  return {
+    level: "Nguy hại",
+    advice:
+      "Báo động đỏ! Ảnh hưởng nghiêm trọng đến sức khỏe mọi người. Tuyệt đối không ra ngoài.",
+  };
+}
 // --- VẼ BIỂU ĐỒ LINE (HOURLY) ---
 function renderLineChart(domId, title, color, labels, values) {
   const dom = document.getElementById(domId);
@@ -163,10 +207,20 @@ async function loadStations() {
         fillOpacity: 0.95,
       }).addTo(markersLayer);
 
+      const info = getAQIInfo(st.aqi); // <--- THÊM DÒNG NÀY ĐỂ LẤY INFO
+
       marker.bindPopup(
-        `<div style="text-align:center;font-family:system-ui">
-          <b>${st.name}</b><br>
-          <span style="font-size:28px;font-weight:900;color:${color}">AQI ${st.aqi}</span>
+        `<div style="text-align:center;font-family:system-ui; min-width: 200px;">
+          <b style="font-size: 16px;">${st.name}</b><br>
+          <div style="margin: 5px 0;">
+            <span style="font-size:28px;font-weight:900;color:${color}">AQI ${st.aqi}</span>
+          </div>
+          <div style="background-color: ${color}; color: #fff; padding: 2px 8px; border-radius: 4px; display: inline-block; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
+            ${info.level}
+          </div>
+          <div style="margin-top: 8px; font-size: 13px; color: #333; font-style: italic;">
+            "${info.advice}"
+          </div>
         </div>`
       );
       marker.on("click", () => selectStation(st));
