@@ -106,15 +106,29 @@ export async function updateAQIData() {
     let sourceLog = "WAQI";
 
     try {
-      // ====== TRẠM IQAIR  ======
+      // ====== TRẠM IQAir: uid null HOẶC bắt đầu bằng "iqair_" ======
       if (
         IQAIR_KEY &&
-        !station.uid &&
+        station.area &&
         (!station.uid || station.uid.startsWith("iqair_"))
       ) {
+        sourceLog = "IQAir";
+
+        // Map area tiếng Việt sang tên tiếng Anh để IQAir nhận chính xác
+        const cityMap = {
+          "Cầu Giấy": "Cau Giay",
+          "Hoàn Kiếm": "Hoan Kiem",
+          "Thanh Xuân": "Thanh Xuan",
+          "Ba Đình": "Ba Dinh",
+          "Hà Đông": "Ha Dong",
+          "Toàn thành phố": "Hanoi",
+          "Quận Tây Hồ/Bắc Từ Liêm": "Hanoi", // fallback cho UNIS
+        };
+        const city = cityMap[station.area.trim()] || "Hanoi";
+
         const res = await fetch(
           `https://api.airvisual.com/v2/city?city=${encodeURIComponent(
-            station.area
+            city
           )}&state=Hanoi&country=Vietnam&key=${IQAIR_KEY}`
         );
         const json = await res.json();
@@ -124,20 +138,20 @@ export async function updateAQIData() {
           json.data?.current?.pollution?.aqius != null
         ) {
           const d = json.data.current.pollution;
-          aqi = Number(d.aqius); // ép số, tránh NaN
+          aqi = Number(d.aqius);
           pm25 = d.pm25 ?? null;
           pm10 = d.pm10 ?? null;
-          sourceLog = "IQAir";
           success++;
         } else {
           console.log(
             `IQAir không có dữ liệu cho ${station.name}:`,
-            json.message || json.status
+            json.message || json.status || "No data"
           );
         }
       }
-      // ====== TRẠM AQICN ======
-      else if (station.uid && AQICN_TOKEN) {
+      // ====== TRẠM WAQI: chỉ khi uid là số thuần túy ======
+      else if (station.uid && !isNaN(station.uid) && AQICN_TOKEN) {
+        sourceLog = "WAQI";
         const res = await fetch(
           `https://api.waqi.info/feed/@${station.uid}/?token=${AQICN_TOKEN}`,
           { timeout: 15000 }
@@ -153,7 +167,6 @@ export async function updateAQIData() {
           no2 = d.iaqi?.no2?.v ?? null;
           so2 = d.iaqi?.so2?.v ?? null;
           co = d.iaqi?.co?.v ?? null;
-          sourceLog = "WAQI";
           success++;
         }
       }
@@ -161,12 +174,23 @@ export async function updateAQIData() {
       console.error(`Lỗi ${sourceLog} ${station.name}:`, err.message);
     }
 
+    // === CHỐNG NaN TRIỆT ĐỂ TRƯỚC KHI LƯU DB ===
+    if (aqi !== null) {
+      const parsed = parseInt(aqi, 10);
+      if (isNaN(parsed)) {
+        aqi = null;
+      } else {
+        aqi = parsed;
+      }
+    }
+
     // Cập nhật bảng stations
     await pool.query(
       `INSERT INTO stations (name, lat, lon, area) VALUES ($1,$2,$3,$4)
        ON CONFLICT (name) DO UPDATE SET updated_at = NOW()`,
-      [station.name, station.lat, station.lon, station.area]
+      [station.name, station.lat, station.lon, station.area || "Hà Nội"]
     );
+
     // Cập nhật bảng station_history
     await pool.query(
       `INSERT INTO station_history (station_id, aqi, pm25, pm10, o3, no2, so2, co, recorded_at)
@@ -183,6 +207,11 @@ export async function updateAQIData() {
         .slice(-8)}`
     );
   }
+
+  // Sửa log cuối để hiện đúng số trạm
+  console.log(
+    `\nHOÀN TẤT! ${success}/${allStations.length} trạm có AQI | Dữ liệu mới nhất: ${timeStr}\n`
+  );
 
   // Log thời gian mới nhất trong DB
   const latest = await pool.query(
