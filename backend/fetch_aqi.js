@@ -115,13 +115,21 @@ export async function updateAQIData() {
         );
         const json = await res.json();
 
-        if (json.status === "success") {
+        if (
+          json.status === "success" &&
+          json.data?.current?.pollution?.aqius != null
+        ) {
           const d = json.data.current.pollution;
-          aqi = d.aqius;
-          pm25 = d.pm25 || null;
-          pm10 = d.pm10 || null;
+          aqi = Number(d.aqius); // ép số, tránh NaN
+          pm25 = d.pm25 ?? null;
+          pm10 = d.pm10 ?? null;
           sourceLog = "IQAir";
           success++;
+        } else {
+          console.log(
+            `IQAir không có dữ liệu cho ${station.name}:`,
+            json.message || json.status
+          );
         }
       }
       // ====== TRẠM AQICN ======
