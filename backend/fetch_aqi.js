@@ -107,7 +107,11 @@ export async function updateAQIData() {
 
     try {
       // ====== TRẠM IQAIR  ======
-      if (IQAIR_KEY && !station.uid && station.area) {
+      if (
+        IQAIR_KEY &&
+        !station.uid &&
+        (!station.uid || station.uid.startsWith("iqair_"))
+      ) {
         const res = await fetch(
           `https://api.airvisual.com/v2/city?city=${encodeURIComponent(
             station.area
