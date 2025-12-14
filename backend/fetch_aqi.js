@@ -50,26 +50,11 @@ const STATIONS = [
 // IQAir Stations in Hanoi
 const IQAIR_STATIONS = [
   {
-    name: "Hà Nội Tổng hợp (IQAir)",
-    area: "Hanoi",
-    lat: 21.02851,
-    lon: 105.85417,
-  },
-  {
-    name: "Hoàn Kiếm (IQAir)",
-    area: "Hoan Kiem",
-    lat: 21.02888,
-    lon: 105.85223,
-  },
-  { name: "Cầu Giấy (IQAir)", area: "Cau Giay", lat: 21.03583, lon: 105.79861 },
-  { name: "Thanh Xuân (IQAir)", area: "Thanh Xuan", lat: 20.998, lon: 105.81 },
-  {
     name: "Ba Đình US Embassy (IQAir)",
     area: "Ba Dinh",
     lat: 21.03333,
     lon: 105.81722,
   },
-  { name: "Hà Đông (IQAir)", area: "Ha Dong", lat: 20.9625, lon: 105.7694 },
 ];
 export async function updateAQIData() {
   if (!AQICN_TOKEN && !IQAIR_KEY) {
