@@ -12,11 +12,11 @@ const STATIONS = [
     area: "Trung tâm",
   },
   {
-    name: "Nguyễn Duy Trinh",
-    uid: "44334",
-    lat: 20.9625,
-    lon: 105.7694,
-    area: "Hoàn Kiếm",
+    name: "Chi cục BVMT Hà Nội",
+    uid: "13026",
+    lat: 21.01525,
+    lon: 105.80013,
+    area: "Ba Đình",
   },
   {
     name: "UNIS Hà Nội",
@@ -31,13 +31,6 @@ const STATIONS = [
     lat: 21.02888,
     lon: 105.85223,
     area: "Hoàn Kiếm",
-  },
-  {
-    name: "Hàng Đậu",
-    uid: "9509",
-    lat: 21.04172,
-    lon: 105.84917,
-    area: "Ba Đình",
   },
   {
     name: "Cầu Giấy",
