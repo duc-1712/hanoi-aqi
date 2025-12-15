@@ -5,6 +5,13 @@ const AQICN_TOKEN = process.env.AQICN_TOKEN;
 const IQAIR_KEY = process.env.IQAIR_API_KEY;
 const STATIONS = [
   {
+    name: "Hà Nội (Trạm chính CEM)",
+    uid: "1583",
+    lat: 21.0491,
+    lon: 105.8831,
+    area: "Trung tâm",
+  },
+  {
     name: "Nguyễn Duy Trinh",
     uid: "44334",
     lat: 20.9625,
