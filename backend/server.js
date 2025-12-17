@@ -205,9 +205,9 @@ app.listen(PORT, async () => {
 
     try {
       await updateAQIData();
-      // Xóa dữ liệu cũ hơn 7 ngày để nhẹ DB
+      // Xóa dữ liệu cũ hơn 30 ngày để nhẹ DB
       await pool.query(
-        `DELETE FROM station_history WHERE recorded_at < NOW() - INTERVAL '7 days'`
+        `DELETE FROM station_history WHERE recorded_at < NOW() - INTERVAL '30 days'`
       );
       console.log(`-> Cập nhật thành công lúc ${nowVN}`);
     } catch (err) {
