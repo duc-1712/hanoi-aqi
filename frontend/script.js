@@ -121,7 +121,6 @@ function renderDailyAQIChart(labels = [], values = []) {
   const chart = echarts.init(dom);
   chartInstances["daily-aqi"] = chart;
 
-  // Nếu không có dữ liệu → để trống
   if (!labels.length || !values.length) {
     chart.clear();
     return;
@@ -207,7 +206,7 @@ async function loadStations() {
         fillOpacity: 0.95,
       }).addTo(markersLayer);
 
-      const info = getAQIInfo(st.aqi); // <--- THÊM DÒNG NÀY ĐỂ LẤY INFO
+      const info = getAQIInfo(st.aqi); // DÒNG NÀY ĐỂ LẤY INFO
 
       marker.bindPopup(
         `<div style="text-align:center;font-family:system-ui; min-width: 200px;">

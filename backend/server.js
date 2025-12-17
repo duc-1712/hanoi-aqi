@@ -14,9 +14,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "../frontend")));
 
-// =============================
 // API STATIONS
-// =============================
 app.get("/api/stations", async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -70,7 +68,7 @@ app.get("/api/history", async (req, res) => {
     }
     const stationId = stationResult.rows[0].id;
 
-    // DAILY MODE – 7 ngày gần nhất
+    // DAILY MODE
     if (mode === "daily") {
       const { rows } = await pool.query(
         `
@@ -88,10 +86,10 @@ app.get("/api/history", async (req, res) => {
         WHERE station_id = $1
           AND recorded_at >= NOW() - INTERVAL '10 days'
           AND aqi IS NOT NULL
-        -- FIX: Group by cũng phải theo giờ VN
+        
         GROUP BY DATE(recorded_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh')
         ORDER BY date DESC
-        LIMIT 7
+        LIMIT 10
         `,
         [stationId]
       );
@@ -207,9 +205,9 @@ app.listen(PORT, async () => {
 
     try {
       await updateAQIData();
-      // Xóa dữ liệu cũ hơn 12 ngày để nhẹ DB
+      // Xóa dữ liệu cũ hơn 7 ngày để nhẹ DB
       await pool.query(
-        `DELETE FROM station_history WHERE recorded_at < NOW() - INTERVAL '12 days'`
+        `DELETE FROM station_history WHERE recorded_at < NOW() - INTERVAL '7 days'`
       );
       console.log(`-> Cập nhật thành công lúc ${nowVN}`);
     } catch (err) {

@@ -99,7 +99,6 @@ export async function updateAQIData() {
       ) {
         sourceLog = "IQAir";
 
-        // Map area tiếng Việt sang tên tiếng Anh để IQAir nhận chính xác
         const cityMap = {
           "Cầu Giấy": "Cau Giay",
           "Hoàn Kiếm": "Hoan Kiem",
@@ -159,7 +158,6 @@ export async function updateAQIData() {
       console.error(`Lỗi ${sourceLog} ${station.name}:`, err.message);
     }
 
-    // === CHỐNG NaN TRIỆT ĐỂ TRƯỚC KHI LƯU DB ===
     if (aqi !== null) {
       const parsed = parseInt(aqi, 10);
       if (isNaN(parsed)) {

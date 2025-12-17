@@ -7,9 +7,7 @@ CREATE OR REPLACE FUNCTION update_updated_at_column() RETURNS TRIGGER AS $$ BEGI
 RETURN NEW;
 END;
 $$ language 'plpgsql';
--- --------------------------------------------------------
 -- 2. Cấu trúc bảng cho bảng 'stations'
--- --------------------------------------------------------
 CREATE TABLE "stations" (
     "id" SERIAL PRIMARY KEY,
     "name" VARCHAR(100) NOT NULL UNIQUE,
@@ -24,9 +22,7 @@ CREATE TABLE "stations" (
 -- Tạo Trigger để cập nhật cột updated_at khi có thay đổi dữ liệu
 CREATE TRIGGER update_stations_modtime BEFORE
 UPDATE ON "stations" FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
--- --------------------------------------------------------
 -- 3. Cấu trúc bảng cho bảng 'station_history'
--- --------------------------------------------------------
 CREATE TABLE "station_history" (
     "id" BIGSERIAL PRIMARY KEY,
     "station_id" INT NOT NULL,
@@ -61,17 +57,7 @@ CREATE INDEX idx_history_station_id ON "station_history" ("station_id");
 --         "created_at",
 --         "updated_at"
 --     )
--- VALUES (
---         1,
---         'Nguyễn Duy Trinh',
---         NULL,
---         20.962500,
---         105.769400,
---         'Hà Đông',
---         TRUE,
---         '2025-12-09 02:28:44',
---         '2025-12-09 02:28:44'
---     ),
+-- VALUES 
 --     (
 --         2,
 --         'UNIS Hà Nội',
@@ -84,16 +70,7 @@ CREATE INDEX idx_history_station_id ON "station_history" ("station_id");
 --         '2025-12-09 02:28:44'
 --     ),
 --     (
---         3,
---         'Mỗ Lao - Hà Đông',
---         NULL,
---         20.978890,
---         105.778060,
---         'Hà Đông',
---         TRUE,
---         '2025-12-09 02:28:44',
---         '2025-12-09 02:28:44'
---     ),
+--       
 --     (
 --         4,
 --         'Hoàn Kiếm',
@@ -105,17 +82,7 @@ CREATE INDEX idx_history_station_id ON "station_history" ("station_id");
 --         '2025-12-09 02:28:44',
 --         '2025-12-09 02:28:44'
 --     ),
---     (
---         5,
---         'Hàng Đậu',
---         NULL,
---         21.041720,
---         105.849170,
---         'Long Biên',
---         TRUE,
---         '2025-12-09 02:28:44',
---         '2025-12-09 02:28:44'
---     ),
+--   
 --     (
 --         6,
 --         'Cầu Giấy',
@@ -127,10 +94,7 @@ CREATE INDEX idx_history_station_id ON "station_history" ("station_id");
 --         '2025-12-09 02:28:44',
 --         '2025-12-09 02:28:44'
 --     );
--- -- --------------------------------------------------------
--- -- 5. Cập nhật lại Sequence (Quan trọng)
--- -- Vì chúng ta insert cứng ID (1,2...6), cần báo cho PostgreSQL biết để ID tiếp theo bắt đầu từ 7
--- -- --------------------------------------------------------
+-- -- Cập nhật lại giá trị của sequence để tránh lỗi khi chèn dữ liệu mới   
 -- SELECT setval(
 --         'stations_id_seq',
 --         (
