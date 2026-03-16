@@ -1,4 +1,3 @@
--- Bắt đầu Transaction
 BEGIN;
 -- Xóa bảng cũ nếu tồn tại (để tránh lỗi khi chạy lại)
 DROP TABLE IF EXISTS "station_history";

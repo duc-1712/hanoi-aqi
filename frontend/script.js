@@ -1,5 +1,5 @@
-const API_URL = "https://hanoi-aqi.onrender.com/api/stations";
-const HISTORY_API_URL = "https://hanoi-aqi.onrender.com/api/history";
+const API_URL = "https://vietnam-aqi-api.onrender.com/stations";
+const HISTORY_API_URL = "https://vietnam-aqi-api.onrender.com/api/history";
 
 const map = L.map("map").setView([21.0285, 105.8542], 12);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -220,7 +220,7 @@ async function loadStations() {
           <div style="margin-top: 8px; font-size: 13px; color: #333; font-style: italic;">
             "${info.advice}"
           </div>
-        </div>`
+        </div>`,
       );
       marker.on("click", () => selectStation(st));
     });
@@ -254,7 +254,7 @@ async function selectStation(st) {
     const marker = markersLayer
       .getLayers()
       .find(
-        (m) => m.getLatLng().lat === st.lat && m.getLatLng().lng === st.lon
+        (m) => m.getLatLng().lat === st.lat && m.getLatLng().lng === st.lon,
       );
     if (marker) {
       marker.setRadius(20);
@@ -271,7 +271,7 @@ async function selectStation(st) {
 async function loadHourlyHistory(name) {
   try {
     const res = await fetch(
-      `${HISTORY_API_URL}?name=${encodeURIComponent(name)}`
+      `${HISTORY_API_URL}?name=${encodeURIComponent(name)}`,
     );
     const d = await res.json();
     if (!d.times?.length) return;
@@ -290,7 +290,7 @@ async function loadHourlyHistory(name) {
 async function loadDailyHistory(name) {
   try {
     const res = await fetch(
-      `${HISTORY_API_URL}?name=${encodeURIComponent(name)}&mode=daily`
+      `${HISTORY_API_URL}?name=${encodeURIComponent(name)}&mode=daily`,
     );
     // KIỂM TRA STATUS
     if (!res.ok) {
