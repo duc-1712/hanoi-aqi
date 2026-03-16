@@ -61,7 +61,7 @@ app.get("/api/history", async (req, res) => {
     // Lấy station_id từ tên trạm
     const stationResult = await pool.query(
       `SELECT id FROM stations WHERE name = $1 AND is_active = true`,
-      [name]
+      [name],
     );
     if (stationResult.rows.length === 0) {
       return res.status(404).json({ error: "Trạm không tồn tại" });
@@ -91,14 +91,14 @@ app.get("/api/history", async (req, res) => {
         ORDER BY date DESC
         LIMIT 10
         `,
-        [stationId]
+        [stationId],
       );
 
       const reversed = rows.reverse();
       const dates = reversed.map((r) => {
         const d = new Date(r.date);
         return `${String(d.getDate()).padStart(2, "0")}/${String(
-          d.getMonth() + 1
+          d.getMonth() + 1,
         ).padStart(2, "0")}`;
       });
 
@@ -129,16 +129,16 @@ app.get("/api/history", async (req, res) => {
         ORDER BY recorded_at DESC
         LIMIT 72
         `,
-        [stationId]
+        [stationId],
       );
 
       const reversed = rows.reverse();
       const times = reversed.map((r) => {
         const d = new Date(r.local_time);
         return `${String(d.getDate()).padStart(2, "0")}/${String(
-          d.getMonth() + 1
+          d.getMonth() + 1,
         ).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(
-          d.getMinutes()
+          d.getMinutes(),
         ).padStart(2, "0")}`;
       });
 
@@ -200,14 +200,14 @@ app.listen(PORT, async () => {
     console.log(
       `\n[${
         isManual ? "KHỞI ĐỘNG" : "CRON JOB"
-      }] Bắt đầu cập nhật AQI - ${nowVN}`
+      }] Bắt đầu cập nhật AQI - ${nowVN}`,
     );
 
     try {
       await updateAQIData();
       // Xóa dữ liệu cũ hơn 30 ngày để nhẹ DB
       await pool.query(
-        `DELETE FROM station_history WHERE recorded_at < NOW() - INTERVAL '30 days'`
+        `DELETE FROM station_history WHERE recorded_at < NOW() - INTERVAL '30 days'`,
       );
       console.log(`-> Cập nhật thành công lúc ${nowVN}`);
     } catch (err) {
@@ -222,7 +222,7 @@ app.listen(PORT, async () => {
     {
       scheduled: true,
       timezone: "Asia/Ho_Chi_Minh",
-    }
+    },
   );
 
   // 4. QUAN TRỌNG: Chạy cập nhật NGAY LẬP TỨC khi server vừa bật
@@ -230,12 +230,13 @@ app.listen(PORT, async () => {
   await performUpdate(true); // true = chạy thủ công lúc boot
 
   console.log(
-    "\nHỆ THỐNG ĐÃ SẴN SÀNG! Dữ liệu đã được cập nhật và lịch trình Cron đã được thiết lập.\n"
+    "\nHỆ THỐNG ĐÃ SẴN SÀNG! Dữ liệu đã được cập nhật và lịch trình Cron đã được thiết lập.\n",
   );
 
   // Keep-alive (để Render không ngủ khi dùng gói free, ping mỗi 10p)
   setInterval(
-    () => fetch("https://hanoi-aqi.onrender.com/api/stations").catch(() => {}),
-    600000
+    () =>
+      fetch("https://vietnam-aqi-api.onrender.com/stations").catch(() => {}),
+    600000,
   );
 });
