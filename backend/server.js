@@ -181,7 +181,9 @@ app.get("*", (req, res) => {
 // =============================
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, async () => {
-  console.log(`\nSERVER CHẠY THÀNH CÔNG TẠI https://hanoi-aqi.onrender.com\n`);
+  console.log(
+    `\nSERVER CHẠY THÀNH CÔNG TẠI https://vietnam-aqi-api.onrender.com\n`,
+  );
 
   // 1. Kiểm tra kết nối DB
   try {

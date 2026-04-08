@@ -59,7 +59,7 @@ const IQAIR_STATIONS = [
 export async function updateAQIData() {
   if (!AQICN_TOKEN && !IQAIR_KEY) {
     console.error(
-      "Thiếu AQICN_TOKEN hoặc IQAIR_API_KEY trong biến môi trường!"
+      "Thiếu AQICN_TOKEN hoặc IQAIR_API_KEY trong biến môi trường!",
     );
     return;
   }
@@ -67,7 +67,7 @@ export async function updateAQIData() {
   console.log(
     `\nBẮT ĐẦU CẬP NHẬT AQI - ${new Date().toLocaleString("vi-VN", {
       timeZone: "Asia/Ho_Chi_Minh",
-    })}\n`
+    })}\n`,
   );
 
   let success = 0;
@@ -112,8 +112,8 @@ export async function updateAQIData() {
 
         const res = await fetch(
           `https://api.airvisual.com/v2/city?city=${encodeURIComponent(
-            city
-          )}&state=Hanoi&country=Vietnam&key=${IQAIR_KEY}`
+            city,
+          )}&state=Hanoi&country=Vietnam&key=${IQAIR_KEY}`,
         );
         const json = await res.json();
 
@@ -129,7 +129,7 @@ export async function updateAQIData() {
         } else {
           console.log(
             `IQAir không có dữ liệu cho ${station.name}:`,
-            json.message || json.status || "No data"
+            json.message || json.status || "No data",
           );
         }
       }
@@ -138,7 +138,7 @@ export async function updateAQIData() {
         sourceLog = "WAQI";
         const res = await fetch(
           `https://api.waqi.info/feed/@${station.uid}/?token=${AQICN_TOKEN}`,
-          { timeout: 15000 }
+          { timeout: 15000 },
         );
         const json = await res.json();
 
@@ -171,7 +171,7 @@ export async function updateAQIData() {
     await pool.query(
       `INSERT INTO stations (name, lat, lon, area) VALUES ($1,$2,$3,$4)
        ON CONFLICT (name) DO UPDATE SET updated_at = NOW()`,
-      [station.name, station.lat, station.lon, station.area || "Hà Nội"]
+      [station.name, station.lat, station.lon, station.area || "Hà Nội"],
     );
 
     // Cập nhật bảng station_history
@@ -179,26 +179,26 @@ export async function updateAQIData() {
       `INSERT INTO station_history (station_id, aqi, pm25, pm10, o3, no2, so2, co, recorded_at)
        SELECT id, $1,$2,$3,$4,$5,$6,$7,$8 FROM stations WHERE name = $9
        ON CONFLICT (station_id, recorded_at) DO NOTHING`,
-      [aqi, pm25, pm10, o3, no2, so2, co, recorded_at, station.name]
+      [aqi, pm25, pm10, o3, no2, so2, co, recorded_at, station.name],
     );
 
     console.log(
       `${sourceLog.padEnd(6)} ${station.name.padEnd(28)} → AQI ${String(
-        aqi ?? "-"
+        aqi ?? "-",
       ).padStart(3)} | ${recorded_at
         .toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })
-        .slice(-8)}`
+        .slice(-8)}`,
     );
   }
 
   // Sửa log cuối để hiện đúng số trạm
   console.log(
-    `\nHOÀN TẤT! ${success}/${allStations.length} trạm có AQI | Dữ liệu mới nhất: ${timeStr}\n`
+    `\nHOÀN TẤT! ${success}/${allStations.length} trạm có AQI | Dữ liệu mới nhất: ${timeStr}\n`,
   );
 
   // Log thời gian mới nhất trong DB
   const latest = await pool.query(
-    `SELECT recorded_at FROM station_history ORDER BY recorded_at DESC LIMIT 1`
+    `SELECT recorded_at FROM station_history ORDER BY recorded_at DESC LIMIT 1`,
   );
   const timeStr = latest.rows[0]
     ? new Date(latest.rows[0].recorded_at).toLocaleString("vi-VN", {
@@ -206,7 +206,8 @@ export async function updateAQIData() {
       })
     : "Chưa có";
 
+  // Sau đó mới in ra Log
   console.log(
-    `\nHOÀN TẤT! ${success}/${allStations.length} trạm có AQI | Dữ liệu mới nhất: ${timeStr}\n`
+    `\nHOÀN TẤT! ${success}/${allStations.length} trạm có AQI | Dữ liệu mới nhất: ${timeStr}\n`,
   );
 }
