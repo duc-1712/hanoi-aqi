@@ -1,10 +1,25 @@
-const API_URL = "https://vietnam-aqi-api.onrender.com/stations";
-const HISTORY_API_URL = "https://vietnam-aqi-api.onrender.com/api/history";
-
+// const API_URL = "https://vietnam-aqi-api.onrender.com/stations";
+// const HISTORY_API_URL = "https://vietnam-aqi-api.onrender.com/api/history";
+// const API_URL = "https://hanoi-aqi.onrender.com/api/stations";
+// const HISTORY_API_URL = "https://hanoi-aqi.onrender.com/api/history";
+const API_URL = "http://localhost:10000/api/stations";
+const HISTORY_API_URL = "http://localhost:10000/api/history";
+//bản đồ nền
 const map = L.map("map").setView([21.0285, 105.8542], 12);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "&copy; OpenStreetMap",
 }).addTo(map);
+// Lớp WMS từ GeoServer
+const geoserverLayer = L.tileLayer
+  .wms("http://localhost:8080/geoserver/hanoi_aqi/wms", {
+    layers: "hanoi_aqi:vw_latest_station_aqi", // Tên layer được Publish trên GeoServer
+    styles: "style_hanoi_aqi", // Tên style đã tạo trên GeoServer
+    format: "image/png",
+    transparent: true,
+    version: "1.1.0",
+    zIndex: 1000,
+  })
+  .addTo(map);
 
 const markersLayer = L.layerGroup().addTo(map);
 let chartInstances = {};
@@ -198,15 +213,14 @@ async function loadStations() {
       li.onclick = () => selectStation(st);
       list.appendChild(li);
 
+      // --- 2. MARKER TÀNG HÌNH ĐỂ CLICK ---
       const marker = L.circleMarker([st.lat, st.lon], {
-        radius: 13,
-        weight: 3,
-        color: "#fff",
-        fillColor: color,
-        fillOpacity: 0.95,
+        radius: 15,
+        opacity: 0, // Giấu viền
+        fillOpacity: 0, // Giấu màu nền
       }).addTo(markersLayer);
 
-      const info = getAQIInfo(st.aqi); // DÒNG NÀY ĐỂ LẤY INFO
+      const info = getAQIInfo(st.aqi);
 
       marker.bindPopup(
         `<div style="text-align:center;font-family:system-ui; min-width: 200px;">

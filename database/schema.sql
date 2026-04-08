@@ -103,3 +103,111 @@ CREATE INDEX idx_history_station_id ON "station_history" ("station_id");
 --     );
 -- -- Kết thúc Transaction
 -- COMMIT;
+-- 1. BẢNG TRẠM (Dữ liệu tĩnh)
+-- Tích hợp thêm trường 'geom' để QGIS và GeoServer có thể đọc được tọa độ
+-- CREATE TABLE stations (
+--     id SERIAL PRIMARY KEY,
+--     name VARCHAR(100),
+--     uid VARCHAR(20),       -- Dùng để lưu ID trạm trên hệ thống của AQICN (nếu cần)
+--     lat NUMERIC(10,6),
+--     lon NUMERIC(10,6),
+--     geom GEOMETRY(Point, 4326), -- Cột không gian bắt buộc (Hệ WGS 84)
+--     area VARCHAR(50),
+--     is_active BOOLEAN DEFAULT TRUE,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- );
+-- -- Tạo chỉ mục không gian giúp tải bản đồ trên Web nhanh hơn
+-- CREATE INDEX sidx_stations_geom ON stations USING GIST (geom);
+-- -- 2. BẢNG LỊCH SỬ (Dữ liệu động)
+-- -- Giữ nguyên các trường chỉ số ô nhiễm chi tiết của bạn
+-- CREATE TABLE station_history (
+--     id BIGSERIAL PRIMARY KEY,
+--     station_id INTEGER REFERENCES stations(id) ON DELETE CASCADE,
+--     aqi INTEGER,
+--     pm25 NUMERIC(8,2),
+--     pm10 NUMERIC(8,2),
+--     o3 NUMERIC(8,2),
+--     no2 NUMERIC(8,2),
+--     so2 NUMERIC(8,2),
+--     co NUMERIC(8,2),
+--     temperature NUMERIC(5,2),
+--     humidity NUMERIC(5,2),
+--     recorded_at TIMESTAMP
+-- );
+-- -- 3. TẠO VIEW (Lớp trung gian cho GeoServer)
+-- -- GeoServer không thể tự join 2 bảng để vẽ bản đồ. Nó cần một bảng phẳng chứa cả tọa độ (geom) và chỉ số AQI mới nhất.
+-- CREATE OR REPLACE VIEW vw_latest_station_aqi AS
+-- SELECT 
+--     s.id AS station_id, 
+--     s.name, 
+--     s.geom, 
+--     h.aqi, 
+--     h.pm25, 
+--     h.pm10,
+--     h.o3,
+--     h.no2,
+--     h.so2,
+--     h.co,
+--     h.temperature,
+--     h.humidity,
+--     h.recorded_at
+-- FROM stations s
+-- JOIN station_history h ON s.id = h.station_id
+-- WHERE h.recorded_at = (
+--     -- Lệnh này đảm bảo bản đồ luôn chỉ lấy dòng dữ liệu có thời gian mới nhất của mỗi trạm
+--     SELECT MAX(recorded_at) 
+--     FROM station_history 
+--     WHERE station_id = s.id
+-- );
+-- //////////////////////////////////////////////////////////////////////////////////////////////
+-- // update schema.sql for PostGIS and GeoServer integration 
+-- //////////////////////////////////////////////////////////////////////////////////////////////
+-- -- 1. Tạo bảng stations
+-- CREATE TABLE stations (
+--     id SERIAL PRIMARY KEY,
+--     name VARCHAR(255) UNIQUE NOT NULL,
+--     uid VARCHAR(50),
+--     lat NUMERIC(10, 6),
+--     lon NUMERIC(10, 6),
+--     area VARCHAR(100),
+--     is_active BOOLEAN DEFAULT true,
+--     geom GEOMETRY(Point, 4326),
+--     created_at TIMESTAMPTZ DEFAULT NOW(),
+--     updated_at TIMESTAMPTZ DEFAULT NOW()
+-- );
+-- -- 2. Tạo bảng station_history
+-- CREATE TABLE station_history (
+--     id SERIAL PRIMARY KEY,
+--     station_id INTEGER REFERENCES stations(id),
+--     aqi INTEGER,
+--     pm25 NUMERIC(10, 2),
+--     pm10 NUMERIC(10, 2),
+--     o3 NUMERIC(10, 2),
+--     no2 NUMERIC(10, 2),
+--     so2 NUMERIC(10, 2),
+--     co NUMERIC(10, 2),
+--     recorded_at TIMESTAMPTZ DEFAULT NOW(),
+--     UNIQUE(station_id, recorded_at)
+-- );
+-- -- 3. Tạo View cho GeoServer
+-- CREATE OR REPLACE VIEW vw_latest_station_aqi AS
+-- SELECT
+--     s.id,
+--     s.name,
+--     s.uid,
+--     s.area,
+--     s.geom,
+--     h.aqi,
+--     h.pm25,
+--     h.pm10,
+--     h.recorded_at
+-- FROM stations s
+-- LEFT JOIN LATERAL (
+--     SELECT aqi, pm25, pm10, recorded_at
+--     FROM station_history
+--     WHERE station_id = s.id
+--     ORDER BY recorded_at DESC
+--     LIMIT 1
+-- ) h ON true
+-- WHERE s.is_active = true AND s.geom IS NOT NULL;

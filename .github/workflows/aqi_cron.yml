@@ -1,0 +1,34 @@
+name: Tự động cập nhật AQI 30 Phút
+
+on:
+  schedule:
+    # Chạy tự động vào phút 00 và phút 30 mỗi giờ
+    - cron: "0,30 * * * *"
+  workflow_dispatch: # Tạo nút bấm bằng tay trên web để test thử
+
+jobs:
+  run-cron-job:
+    runs-on: ubuntu-latest # Thuê máy chủ Linux miễn phí của GitHub
+
+    steps:
+      - name: Bước 1 - Kéo code của bạn xuống máy chủ
+        uses: actions/checkout@v4
+
+      - name: Bước 2 - Cài đặt môi trường Node.js (Version 20)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Bước 3 - Cài đặt các thư viện cần thiết (npm install)
+        run: |
+          cd backend
+          npm install
+
+      - name: Bước 4 - Chạy con Bot cào dữ liệu
+        env:
+          # Gọi 2 cái chìa khóa bạn đã giấu trong Secrets ra cho code dùng
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AQICN_TOKEN: ${{ secrets.AQICN_TOKEN }}
+        run: |
+          cd backend
+          node run_cron.js
