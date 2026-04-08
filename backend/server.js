@@ -53,13 +53,129 @@ app.get("/api/stations", async (req, res) => {
   }
 });
 
+// // API HISTORY
+// app.get("/api/history", async (req, res) => {
+//   const { name, mode } = req.query;
+//   if (!name) return res.status(400).json({ error: "Thiếu tên trạm" });
+
+//   try {
+//     // Lấy station_id từ tên trạm
+//     const stationResult = await pool.query(
+//       `SELECT id FROM stations WHERE name = $1 AND is_active = true`,
+//       [name],
+//     );
+//     if (stationResult.rows.length === 0) {
+//       return res.status(404).json({ error: "Trạm không tồn tại" });
+//     }
+//     const stationId = stationResult.rows[0].id;
+
+//     // DAILY MODE
+//     if (mode === "daily") {
+//       const { rows } = await pool.query(
+//         `
+//         SELECT
+//           -- FIX: Chuyển UTC -> VN rồi mới lấy DATE
+//           DATE(recorded_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh') AS date,
+//           COALESCE(ROUND(AVG(aqi)::numeric), 0)::INTEGER AS aqi,
+//           ROUND(AVG(pm25)::numeric, 1) AS pm25,
+//           ROUND(AVG(pm10)::numeric, 1) AS pm10,
+//           ROUND(AVG(o3)::numeric, 1) AS o3,
+//           ROUND(AVG(no2)::numeric, 1) AS no2,
+//           ROUND(AVG(so2)::numeric, 1) AS so2,
+//           ROUND(AVG(co)::numeric, 1) AS co
+//         FROM station_history
+//         WHERE station_id = $1
+//           AND recorded_at >= NOW() - INTERVAL '10 days'
+//           AND aqi IS NOT NULL
+
+//         GROUP BY DATE(recorded_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh')
+//         ORDER BY date DESC
+//         LIMIT 10
+//         `,
+//         [stationId],
+//       );
+
+//       const reversed = rows.reverse();
+//       const dates = reversed.map((r) => {
+//         const d = new Date(r.date);
+//         return `${String(d.getDate()).padStart(2, "0")}/${String(
+//           d.getMonth() + 1,
+//         ).padStart(2, "0")}`;
+//       });
+
+//       res.json({
+//         dates,
+//         aqi: reversed.map((r) => r.aqi ?? 0),
+//         pm25: reversed.map((r) => r.pm25 ?? null),
+//         pm10: reversed.map((r) => r.pm10 ?? null),
+//         o3: reversed.map((r) => r.o3 ?? null),
+//         no2: reversed.map((r) => r.no2 ?? null),
+//         so2: reversed.map((r) => r.so2 ?? null),
+//         co: reversed.map((r) => r.co ?? null),
+//       });
+//     }
+
+//     // HOURLY MODE – 72 giờ gần nhất
+//     else {
+//       const { rows } = await pool.query(
+//         `
+//         SELECT
+//           -- FIX: Chuyển UTC -> VN
+//           recorded_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh' AS local_time,
+//           aqi, pm25, pm10, o3, no2, so2, co
+//         FROM station_history
+//         WHERE station_id = $1
+//           AND recorded_at >= NOW() - INTERVAL '3 days'
+//           AND aqi IS NOT NULL
+//         ORDER BY recorded_at DESC
+//         LIMIT 72
+//         `,
+//         [stationId],
+//       );
+
+//       const reversed = rows.reverse();
+//       const times = reversed.map((r) => {
+//         const d = new Date(r.local_time);
+//         return `${String(d.getDate()).padStart(2, "0")}/${String(
+//           d.getMonth() + 1,
+//         ).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(
+//           d.getMinutes(),
+//         ).padStart(2, "0")}`;
+//       });
+
+//       res.json({
+//         times: times.length ? times : Array(24).fill("09/12 00:00"),
+//         aqi: reversed.map((r) => r.aqi ?? null),
+//         pm25: reversed.map((r) => r.pm25 ?? null),
+//         pm10: reversed.map((r) => r.pm10 ?? null),
+//         o3: reversed.map((r) => r.o3 ?? null),
+//         no2: reversed.map((r) => r.no2 ?? null),
+//         so2: reversed.map((r) => r.so2 ?? null),
+//         co: reversed.map((r) => r.co ?? null),
+//       });
+//     }
+//   } catch (err) {
+//     console.error("Lỗi /api/history:", err.message);
+//     res.status(500).json({
+//       dates: mode === "daily" ? Array(7).fill("09/12") : [],
+//       times: mode !== "daily" ? Array(72).fill("09/12 00:00") : [],
+//       aqi: [],
+//       pm25: [],
+//       pm10: [],
+//       o3: [],
+//       no2: [],
+//       so2: [],
+//       co: [],
+//     });
+//   }
+// });
+
 // API HISTORY
 app.get("/api/history", async (req, res) => {
   const { name, mode } = req.query;
   if (!name) return res.status(400).json({ error: "Thiếu tên trạm" });
 
   try {
-    // Lấy station_id từ tên trạm
     const stationResult = await pool.query(
       `SELECT id FROM stations WHERE name = $1 AND is_active = true`,
       [name],
@@ -69,13 +185,16 @@ app.get("/api/history", async (req, res) => {
     }
     const stationId = stationResult.rows[0].id;
 
-    // DAILY MODE
+    // ==========================================
+    // DAILY MODE (Hằng ngày)
+    // ==========================================
     if (mode === "daily") {
       const { rows } = await pool.query(
         `
         SELECT 
-          -- FIX: Chuyển UTC -> VN rồi mới lấy DATE
-          DATE(recorded_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh') AS date,
+          -- CHỈ CẦN 1 LẦN CHUYỂN MÚI GIỜ LÀ CHUẨN ĐÉT
+          to_char(recorded_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'DD/MM/YYYY') AS date_str,
+          DATE(recorded_at AT TIME ZONE 'Asia/Ho_Chi_Minh') AS sort_date,
           COALESCE(ROUND(AVG(aqi)::numeric), 0)::INTEGER AS aqi,
           ROUND(AVG(pm25)::numeric, 1) AS pm25,
           ROUND(AVG(pm10)::numeric, 1) AS pm10,
@@ -87,24 +206,16 @@ app.get("/api/history", async (req, res) => {
         WHERE station_id = $1
           AND recorded_at >= NOW() - INTERVAL '10 days'
           AND aqi IS NOT NULL
-        
-        GROUP BY DATE(recorded_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh')
-        ORDER BY date DESC
+        GROUP BY sort_date, date_str
+        ORDER BY sort_date DESC
         LIMIT 10
         `,
         [stationId],
       );
 
       const reversed = rows.reverse();
-      const dates = reversed.map((r) => {
-        const d = new Date(r.date);
-        return `${String(d.getDate()).padStart(2, "0")}/${String(
-          d.getMonth() + 1,
-        ).padStart(2, "0")}`;
-      });
-
       res.json({
-        dates,
+        dates: reversed.map((r) => r.date_str),
         aqi: reversed.map((r) => r.aqi ?? 0),
         pm25: reversed.map((r) => r.pm25 ?? null),
         pm10: reversed.map((r) => r.pm10 ?? null),
@@ -115,13 +226,15 @@ app.get("/api/history", async (req, res) => {
       });
     }
 
-    // HOURLY MODE – 72 giờ gần nhất
+    // ==========================================
+    // HOURLY MODE (Hằng giờ) – 72 giờ gần nhất
+    // ==========================================
     else {
       const { rows } = await pool.query(
         `
         SELECT 
-          -- FIX: Chuyển UTC -> VN
-          recorded_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh' AS local_time,
+          -- CHỈ CẦN 1 LẦN CHUYỂN MÚI GIỜ
+          to_char(recorded_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI DD/MM') AS time_str,
           aqi, pm25, pm10, o3, no2, so2, co
         FROM station_history
         WHERE station_id = $1
@@ -134,17 +247,10 @@ app.get("/api/history", async (req, res) => {
       );
 
       const reversed = rows.reverse();
-      const times = reversed.map((r) => {
-        const d = new Date(r.local_time);
-        return `${String(d.getDate()).padStart(2, "0")}/${String(
-          d.getMonth() + 1,
-        ).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(
-          d.getMinutes(),
-        ).padStart(2, "0")}`;
-      });
+      const times = reversed.map((r) => r.time_str);
 
       res.json({
-        times: times.length ? times : Array(24).fill("09/12 00:00"),
+        times: times.length ? times : Array(24).fill("00:00 01/01"),
         aqi: reversed.map((r) => r.aqi ?? null),
         pm25: reversed.map((r) => r.pm25 ?? null),
         pm10: reversed.map((r) => r.pm10 ?? null),
@@ -157,8 +263,8 @@ app.get("/api/history", async (req, res) => {
   } catch (err) {
     console.error("Lỗi /api/history:", err.message);
     res.status(500).json({
-      dates: mode === "daily" ? Array(7).fill("09/12") : [],
-      times: mode !== "daily" ? Array(72).fill("09/12 00:00") : [],
+      dates: mode === "daily" ? [] : [],
+      times: mode !== "daily" ? [] : [],
       aqi: [],
       pm25: [],
       pm10: [],
@@ -183,7 +289,7 @@ app.get("*", (req, res) => {
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, async () => {
   console.log(
-    `\nSERVER CHẠY THÀNH CÔNG TẠI https://vietnam-aqi-api.onrender.com\n`,
+    `\nSERVER CHẠY THÀNH CÔNG TẠI PORT ${PORT} - http://localhost:${PORT}\n`,
   );
 
   // 1. Kiểm tra kết nối DB
@@ -237,9 +343,9 @@ app.listen(PORT, async () => {
   );
 
   // Keep-alive (để Render không ngủ khi dùng gói free, ping mỗi 10p)
-  setInterval(
-    () =>
-      fetch("https://vietnam-aqi-api.onrender.com/stations").catch(() => {}),
-    600000,
-  );
+  // setInterval(
+  //   () =>
+  //     fetch("https://vietnam-aqi-api.onrender.com/stations").catch(() => {}),
+  //   600000,
+  // );
 });

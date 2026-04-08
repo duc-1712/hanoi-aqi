@@ -186,11 +186,20 @@ export async function updateAQIData() {
   const latest = await pool.query(
     `SELECT recorded_at FROM station_history ORDER BY recorded_at DESC LIMIT 1`,
   );
-  const timeStr = latest.rows[0]
-    ? new Date(latest.rows[0].recorded_at).toLocaleString("vi-VN", {
-        timeZone: "Asia/Ho_Chi_Minh",
-      })
-    : "Chưa có";
+  const timeStr = new Date().toLocaleString("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+  });
+
+  try {
+    // Các lệnh lấy dữ liệu API...
+    if (aqi === "-") {
+      console.log(`Trạm mất kết nối, bỏ qua. Thời gian: ${timeStr}`);
+      return; // Bỏ qua trạm này, chạy trạm tiếp theo
+    }
+    // ...
+  } catch (error) {
+    console.log(`-> Lỗi cập nhật lúc ${timeStr}:`, error.message);
+  }
 
   // Sau đó mới in ra Log
   console.log(
