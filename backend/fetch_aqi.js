@@ -5,7 +5,14 @@ const AQICN_TOKEN = process.env.AQICN_TOKEN;
 const IQAIR_KEY = process.env.IQAIR_API_KEY;
 const STATIONS = [
   {
-    name: "Hà Nội (Trạm chính CEM)",
+    name: "Trường Quốc tế LHQ (UNIS)",
+    uid: "8688",
+    lat: 21.081121,
+    lon: 105.818031,
+    area: "Quận Tây Hồ/Bắc Từ Liêm",
+  },
+  {
+    name: "Hà Nội (Trạm chung)",
     uid: "1583",
     lat: 21.0491,
     lon: 105.8831,
@@ -19,43 +26,22 @@ const STATIONS = [
     area: "Ba Đình",
   },
   {
-    name: "UNIS Hà Nội",
-    uid: "8688",
-    lat: 21.0811211,
-    lon: 105.8180306,
-    area: "Quận Tây Hồ/Bắc Từ Liêm",
-  },
-  {
-    name: "Hoàn Kiếm",
-    uid: "11158",
-    lat: 21.02888,
-    lon: 105.85223,
-    area: "Hoàn Kiếm",
-  },
-  {
-    name: "Cầu Giấy",
-    uid: "11161",
-    lat: 21.03583,
-    lon: 105.79861,
-    area: "Cầu Giấy",
-  },
-  {
-    name: "Thanh Xuân",
-    uid: "11162",
-    lat: 20.998,
-    lon: 105.81,
-    area: "Thanh Xuân",
+    name: "UBND P. Minh Khai",
+    uid: "13251",
+    lat: 21.04975,
+    lon: 105.74187,
+    area: "Bắc Từ Liêm",
   },
 ];
-// IQAir Stations in Hanoi
-const IQAIR_STATIONS = [
-  {
-    name: "Ba Đình US Embassy (IQAir)",
-    area: "Ba Dinh",
-    lat: 21.03333,
-    lon: 105.81722,
-  },
-];
+// // IQAir Stations in Hanoi
+// const IQAIR_STATIONS = [
+//   {
+//     name: "Ba Đình US Embassy (IQAir)",
+//     area: "Ba Dinh",
+//     lat: 21.03333,
+//     lon: 105.81722,
+//   },
+// ];
 export async function updateAQIData() {
   if (!AQICN_TOKEN && !IQAIR_KEY) {
     console.error(
