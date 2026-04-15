@@ -436,7 +436,15 @@ const HISTORY_API_URL = "http://localhost:10000/api/history";
 // --- BIẾN TOÀN CỤC BỔ SUNG ---
 let allStations = []; // Lưu dữ liệu để dùng cho hàm tìm trạm gần nhất
 let heatmapLayer = L.layerGroup(); // Layer cho Heatmap
-let gadmLayer = L.geoJson(null); // Layer cho GADM
+let gadm1_Layer = L.geoJson(null, {
+  style: { color: "#1e3a8a", weight: 3, fillOpacity: 0 },
+}); // Thành phố
+let gadm2_Layer = L.geoJson(null, {
+  style: { color: "#3b82f6", weight: 2, fillOpacity: 0.05 },
+}); // Quận/Huyện
+let gadm3_Layer = L.geoJson(null, {
+  style: { color: "#93c5fd", weight: 1, fillOpacity: 0 },
+}); // Phường/Xã
 
 // --- BẢN ĐỒ NỀN ---
 const osmTile = L.tileLayer(
@@ -537,8 +545,10 @@ const baseMaps = {
 const overlayMaps = {
   "<span style='color: #ef4444'>●</span> Trạm quan trắc": markersLayer,
   "<span style='color: #f59e0b'>✦</span> Bản đồ nhiệt (Heatmap)": heatmapLayer,
-  "<span style='color: #10b981'>■</span> Ranh giới hành chính": gadmLayer,
-  "GeoServer WMS": geoserverLayer,
+  "── Ranh giới ──": L.layerGroup(), // Chỉ là tiêu đề phân cách
+  "Cấp 1: Thành phố": gadm1_Layer,
+  "Cấp 2: Quận/Huyện": gadm2_Layer,
+  "Cấp 3: Phường/Xã": gadm3_Layer,
 };
 L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
@@ -740,26 +750,26 @@ document.addEventListener("click", (e) => {
 });
 
 // --- TÍNH NĂNG GIS BỔ SUNG ---
-async function drawHeatmap() {
+async function drawHeatmap(boundaryData) {
+  if (!allStations || allStations.length < 2) return;
+  heatmapLayer.clearLayers();
+
   try {
-    const response = await fetch("data/hanoi_boundary.json");
-    const hanoiBoundary = await response.json();
-    gadmLayer.clearLayers().addData(hanoiBoundary); // Hiển thị ranh giới lên map
-
-    if (allStations.length < 2) return;
-    heatmapLayer.clearLayers();
-
+    // Chuyển trạm thành điểm Turf
     const points = turf.featureCollection(
       allStations.map((st) => turf.point([st.lon, st.lat], { aqi: st.aqi })),
     );
 
+    // Nội suy IDW
     const options = {
       gridType: "points",
       property: "aqi",
       units: "kilometers",
     };
     const grid = turf.interpolate(points, 1, options);
-    const clipped = turf.pointsWithinPolygon(grid, hanoiBoundary);
+
+    // Cắt lưới theo ranh giới Hà Nội Cấp 1
+    const clipped = turf.pointsWithinPolygon(grid, boundaryData);
 
     L.geoJson(clipped, {
       pointToLayer: (feature, latlng) => {
@@ -772,7 +782,7 @@ async function drawHeatmap() {
       },
     }).addTo(heatmapLayer);
   } catch (err) {
-    console.error("Heatmap error:", err);
+    console.error("Lỗi vẽ heatmap:", err);
   }
 }
 
@@ -802,7 +812,28 @@ function findNearest() {
     }
   });
 }
+async function loadGADMData() {
+  try {
+    const [res1, res2, res3] = await Promise.all([
+      fetch("data/Hanoi_gadm_1.json"),
+      fetch("data/Hanoi_gadm_2.json"),
+      fetch("data/Hanoi_gadm_3.json"),
+    ]);
 
+    const g1 = await res1.json();
+    const g2 = await res2.json();
+    const g3 = await res3.json();
+
+    gadm1_Layer.addData(g1);
+    gadm2_Layer.addData(g2);
+    gadm3_Layer.addData(g3);
+
+    // QUAN TRỌNG: Vẽ Heatmap sử dụng ranh giới Cấp 1 làm "khuôn"
+    drawHeatmap(g1);
+  } catch (err) {
+    console.error("Lỗi load file GADM:", err);
+  }
+}
 // --- KHỞI ĐỘNG & DỌN DẸP ---
 loadStations();
 setInterval(loadStations, 5 * 60 * 1000);
