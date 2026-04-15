@@ -433,7 +433,20 @@
 const API_URL = "http://localhost:10000/api/stations";
 const HISTORY_API_URL = "http://localhost:10000/api/history";
 
-// --- KHỞI TẠO BẢN ĐỒ (Giữ nguyên của bạn) ---
+// --- BIẾN TOÀN CỤC ---
+let allStations = [];
+let heatmapLayer = L.layerGroup();
+let gadm1_Layer = L.geoJson(null, {
+  style: { color: "#1e3a8a", weight: 3, fillOpacity: 0 },
+});
+let gadm2_Layer = L.geoJson(null, {
+  style: { color: "#3b82f6", weight: 2, fillOpacity: 0.05 },
+});
+let gadm3_Layer = L.geoJson(null, {
+  style: { color: "#93c5fd", weight: 1, fillOpacity: 0 },
+});
+
+// --- KHỞI TẠO BẢN ĐỒ ---
 const map = L.map("map").setView([21.0285, 105.8542], 12);
 const osmTile = L.tileLayer(
   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -442,7 +455,6 @@ const osmTile = L.tileLayer(
   },
 ).addTo(map);
 
-// Lớp WMS từ GeoServer (Giữ nguyên)
 const geoserverLayer = L.tileLayer.wms(
   "http://localhost:8080/geoserver/hanoi_aqi/wms",
   {
@@ -459,20 +471,7 @@ const markersLayer = L.layerGroup().addTo(map);
 let chartInstances = {};
 let currentStationName = "";
 
-// --- CÁC BIẾN BỔ SUNG ĐỂ TRÁNH CRASH ---
-let allStations = []; // Biến này cực kỳ quan trọng để "Tìm trạm gần nhất" không bị lỗi
-let heatmapLayer = L.layerGroup();
-let gadm1_Layer = L.geoJson(null, {
-  style: { color: "#1e3a8a", weight: 3, fillOpacity: 0 },
-});
-let gadm2_Layer = L.geoJson(null, {
-  style: { color: "#3b82f6", weight: 2, fillOpacity: 0.05 },
-});
-let gadm3_Layer = L.geoJson(null, {
-  style: { color: "#93c5fd", weight: 1, fillOpacity: 0 },
-});
-
-// --- MÀU AQI CHUẨN (Giữ nguyên của bạn) ---
+// --- MÀU AQI CHUẨN (GIỮ NGUYÊN 100%) ---
 function getAQIColor(aqi) {
   if (!aqi || aqi < 5) return "#94a3b8";
   if (aqi <= 50) return "#00e400";
@@ -533,7 +532,7 @@ function getAQIInfo(aqi) {
   };
 }
 
-// --- LAYER CONTROL (Sửa lỗi biến chưa định nghĩa) ---
+// --- LAYER CONTROL ---
 const baseMaps = { "Bản đồ nền": osmTile };
 const overlayMaps = {
   "<span style='color: #ef4444'>●</span> Trạm quan trắc": markersLayer,
@@ -545,7 +544,7 @@ const overlayMaps = {
 };
 L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
-// --- CÁC HÀM VẼ BIỂU ĐỒ (Giữ nguyên của bạn) ---
+// --- VẼ BIỂU ĐỒ (GIỮ NGUYÊN) ---
 function renderLineChart(domId, title, color, labels, values) {
   const dom = document.getElementById(domId);
   if (!dom) return;
@@ -582,23 +581,48 @@ function renderDailyAQIChart(labels = [], values = []) {
   if (chartInstances["daily-aqi"]) chartInstances["daily-aqi"].dispose();
   const chart = echarts.init(dom);
   chartInstances["daily-aqi"] = chart;
+  if (!labels.length || !values.length) {
+    chart.clear();
+    return;
+  }
   chart.setOption({
     tooltip: { trigger: "axis", formatter: "<b>AQI {c}</b><br/>{b}" },
     grid: { top: 60, bottom: 80, left: 60, right: 60 },
     xAxis: {
       type: "category",
       data: labels,
-      axisLabel: { interval: 0, rotate: 25 },
+      axisLabel: {
+        fontSize: 14,
+        fontWeight: "bold",
+        color: "#333",
+        interval: 0,
+        rotate: labels.length > 5 ? 25 : 0,
+      },
     },
-    yAxis: { type: "value", max: 500 },
+    yAxis: {
+      type: "value",
+      min: 0,
+      max: 500,
+      splitNumber: 10,
+      axisLabel: { fontSize: 12 },
+      splitLine: { lineStyle: { color: "#eee" } },
+    },
     series: [
       {
         type: "bar",
+        barWidth: "70%",
         data: values.map((v) => ({
-          value: v,
+          value: v || 0,
           itemStyle: { color: getAQIColor(v) },
         })),
-        label: { show: true, position: "top" },
+        label: {
+          show: true,
+          position: "top",
+          fontSize: 18,
+          fontWeight: "bold",
+          color: "#222",
+          formatter: "{c}",
+        },
       },
     ],
   });
@@ -611,7 +635,7 @@ async function loadStations() {
   try {
     const res = await fetch(API_URL);
     const stations = await res.json();
-    allStations = stations; // Gán để findNearest dùng được
+    allStations = stations;
 
     list.innerHTML = "";
     markersLayer.clearLayers();
@@ -635,19 +659,23 @@ async function loadStations() {
       }).addTo(markersLayer);
 
       const info = getAQIInfo(st.aqi);
-      marker.bindPopup(
-        `<b>${st.name}</b><br><span style="font-size:24px;color:${color}">AQI ${st.aqi}</span>`,
-      );
+      marker.bindPopup(`<div style="text-align:center;font-family:system-ui; min-width: 200px;">
+          <b style="font-size: 16px;">${st.name}</b><br>
+          <div style="margin: 5px 0;"><span style="font-size:28px;font-weight:900;color:${color}">AQI ${st.aqi}</span></div>
+          <div style="background-color: ${color}; color: #fff; padding: 2px 8px; border-radius: 4px; display: inline-block; font-weight: bold;">${info.level}</div>
+          <div style="margin-top: 8px; font-size: 13px; color: #333; font-style: italic;">"${info.advice}"</div>
+        </div>`);
       marker.on("click", () => selectStation(st));
     });
 
-    loadGADMData(); // Tải GADM và vẽ heatmap sau khi có trạm
+    loadGADMData();
   } catch (err) {
-    list.innerHTML = "<li style='color:red'>Lỗi tải dữ liệu</li>";
+    list.innerHTML =
+      "<li style='color:red;padding:20px'>Lỗi tải dữ liệu trạm</li>";
   }
 }
 
-// --- CHỌN TRẠM & LỊCH SỬ (Giữ nguyên của bạn) ---
+// --- CHỌN TRẠM (BAO GỒM LỜI KHUYÊN ĐỘNG) ---
 async function selectStation(st) {
   currentStationName = st.name;
   document.getElementById("chart-instruction").classList.add("hidden");
@@ -655,10 +683,21 @@ async function selectStation(st) {
   document.getElementById("selected-station-name").textContent = st.name;
   document.getElementById("current-stats").classList.remove("hidden");
 
+  // Cập nhật Box lời khuyên dưới bảng chỉ số hiện tại
+  const info = getAQIInfo(st.aqi);
+  const adviceBox = document.getElementById("aqi-advice-text");
+  if (adviceBox) {
+    adviceBox.innerHTML = `
+      <div style="padding: 15px; border-radius: 10px; background: ${getAQIColor(st.aqi)}15; border-left: 6px solid ${getAQIColor(st.aqi)}; margin-bottom: 15px;">
+        <h4 style="margin: 0 0 5px; color: ${getAQIColor(st.aqi)}">${info.level}</h4>
+        <p style="margin: 0; color: #374151; line-height: 1.5;">${info.advice}</p>
+      </div>`;
+  }
+
   ["aqi", "pm25", "pm10", "no2", "co", "so2", "o3"].forEach((k) => {
     const el = document.getElementById(`val-${k}`);
     if (el) {
-      el.textContent = st[k] ?? "--";
+      el.textContent = st[k] !== null && st[k] !== undefined ? st[k] : "--";
       if (k === "aqi") el.style.color = getAQIColor(st[k]);
     }
   });
@@ -669,6 +708,7 @@ async function selectStation(st) {
   isDaily ? loadDailyHistory(st.name) : loadHourlyHistory(st.name);
 }
 
+// --- FETCH LỊCH SỬ (GIỮ NGUYÊN) ---
 async function loadHourlyHistory(name) {
   try {
     const res = await fetch(
@@ -680,8 +720,10 @@ async function loadHourlyHistory(name) {
     renderLineChart("chart-pm10", "PM10", "#10b981", d.times, d.pm10);
     renderLineChart("chart-no2", "NO₂", "#f59e0b", d.times, d.no2);
     renderLineChart("chart-co", "CO", "#ef4444", d.times, d.co);
+    renderLineChart("chart-o3", "O₃", "#8b5cf6", d.times, d.o3);
+    renderLineChart("chart-so2", "SO₂", "#6366f1", d.times, d.so2);
   } catch (err) {
-    console.error(err);
+    console.error("Lỗi hourly:", err);
   }
 }
 
@@ -690,6 +732,10 @@ async function loadDailyHistory(name) {
     const res = await fetch(
       `${HISTORY_API_URL}?name=${encodeURIComponent(name)}&mode=daily`,
     );
+    if (!res.ok) {
+      renderDailyAQIChart([], []);
+      return;
+    }
     const d = await res.json();
     renderDailyAQIChart(d.dates || [], d.aqi || []);
   } catch (err) {
@@ -697,7 +743,7 @@ async function loadDailyHistory(name) {
   }
 }
 
-// --- CHUYỂN TAB (Giữ nguyên của bạn) ---
+// --- XỬ LÝ SỰ KIỆN CLICK (GIỮ NGUYÊN) ---
 document.addEventListener("click", (e) => {
   if (!e.target.matches(".tab-btn")) return;
   document
@@ -716,13 +762,13 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// --- TÍNH NĂNG GIS ---
+// --- GIS - ĐƯỜNG DẪN TRONG THƯ MỤC DỰ ÁN (SỬA ĐUÔI .GEOJSON) ---
 async function loadGADMData() {
   try {
     const [res1, res2, res3] = await Promise.all([
-      fetch("geodata/Hanoi_gadm_1.json"),
-      fetch("geodata/Hanoi_gadm_2.json"),
-      fetch("geodata/Hanoi_gadm_3.json"),
+      fetch("geodata/Hanoi_gadm_1.geojson"),
+      fetch("geodata/Hanoi_gadm_2.geojson"),
+      fetch("geodata/Hanoi_gadm_3.geojson"),
     ]);
     const g1 = await res1.json();
     const g2 = await res2.json();
@@ -732,9 +778,12 @@ async function loadGADMData() {
     gadm2_Layer.clearLayers().addData(g2);
     gadm3_Layer.clearLayers().addData(g3);
 
-    drawHeatmap(g1); // Vẽ heatmap theo ranh giới HN
+    drawHeatmap(g1);
   } catch (err) {
-    console.error("Lỗi GADM:", err);
+    console.error(
+      "Lỗi load GADM: Kiểm tra lại tên file trong thư mục geodata.",
+      err,
+    );
   }
 }
 
@@ -745,7 +794,7 @@ async function drawHeatmap(boundaryData) {
     const points = turf.featureCollection(
       allStations.map((st) => turf.point([st.lon, st.lat], { aqi: st.aqi })),
     );
-    const grid = turf.interpolate(points, 1, {
+    const grid = turf.interpolate(points, 1.5, {
       gridType: "points",
       property: "aqi",
       units: "kilometers",
@@ -754,14 +803,14 @@ async function drawHeatmap(boundaryData) {
     L.geoJson(clipped, {
       pointToLayer: (feature, latlng) =>
         L.circleMarker(latlng, {
-          radius: 20,
+          radius: 25,
           fillColor: getAQIColor(feature.properties.aqi),
           color: "none",
-          fillOpacity: 0.5,
+          fillOpacity: 0.45,
         }),
     }).addTo(heatmapLayer);
   } catch (err) {
-    console.error(err);
+    console.error("Lỗi vẽ heatmap:", err);
   }
 }
 
@@ -781,19 +830,26 @@ function findNearest() {
     if (nearestSt) {
       L.popup()
         .setLatLng(userLoc)
-        .setContent(`Trạm gần nhất: <b>${nearestSt.name}</b>`)
+        .setContent(
+          `Vị trí của bạn.<br>Trạm gần nhất: <b>${nearestSt.name}</b> (${(minDest / 1000).toFixed(2)} km)`,
+        )
         .openOn(map);
       selectStation(nearestSt);
     }
   });
 }
 
-// --- KHỞI ĐỘNG (Giữ nguyên) ---
+// --- KHỞI ĐỘNG ---
 loadStations();
+setInterval(loadStations, 5 * 60 * 1000);
 
 document.getElementById("toggle-sidebar").addEventListener("click", () => {
   document.getElementById("sidebar").classList.toggle("hidden");
   setTimeout(() => map.invalidateSize(), 300);
+});
+
+window.addEventListener("beforeunload", () => {
+  Object.values(chartInstances).forEach((c) => c?.dispose());
 });
 
 setTimeout(() => {
