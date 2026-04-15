@@ -43,6 +43,25 @@ const STATIONS = [
 //   },
 // ];
 export async function updateAQIData() {
+  const timeStr = new Date().toLocaleString("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+  });
+
+  try {
+    // Các lệnh lấy dữ liệu API...
+    if (aqi === "-") {
+      console.log(`Trạm mất kết nối, bỏ qua. Thời gian: ${timeStr}`);
+      return; // Bỏ qua trạm này, chạy trạm tiếp theo
+    }
+    // ...
+  } catch (error) {
+    console.log(`-> Lỗi cập nhật lúc ${timeStr}:`, error.message);
+  }
+
+  // Sau đó mới in ra Log
+  console.log(
+    `\nHOÀN TẤT! ${success}/${allStations.length} trạm có AQI | Dữ liệu mới nhất: ${timeStr}\n`,
+  );
   if (!AQICN_TOKEN && !IQAIR_KEY) {
     console.error(
       "Thiếu AQICN_TOKEN hoặc IQAIR_API_KEY trong biến môi trường!",
@@ -185,24 +204,5 @@ export async function updateAQIData() {
   // Log thời gian mới nhất trong DB
   const latest = await pool.query(
     `SELECT recorded_at FROM station_history ORDER BY recorded_at DESC LIMIT 1`,
-  );
-  const timeStr = new Date().toLocaleString("vi-VN", {
-    timeZone: "Asia/Ho_Chi_Minh",
-  });
-
-  try {
-    // Các lệnh lấy dữ liệu API...
-    if (aqi === "-") {
-      console.log(`Trạm mất kết nối, bỏ qua. Thời gian: ${timeStr}`);
-      return; // Bỏ qua trạm này, chạy trạm tiếp theo
-    }
-    // ...
-  } catch (error) {
-    console.log(`-> Lỗi cập nhật lúc ${timeStr}:`, error.message);
-  }
-
-  // Sau đó mới in ra Log
-  console.log(
-    `\nHOÀN TẤT! ${success}/${allStations.length} trạm có AQI | Dữ liệu mới nhất: ${timeStr}\n`,
   );
 }
