@@ -802,52 +802,50 @@ async function loadGADMData() {
       fetch("geodata/Hanoi_gadm_3.geojson"),
     ]);
 
-    if (!res1.ok) throw new Error("Kiểm tra lại file geojson!");
-
     const g1 = await res1.json();
     const g2 = await res2.json();
     const g3 = await res3.json();
 
-    // --- CHỈNH STYLE NÉT CĂNG CHO 3 CẤP ---
+    // --- THIẾT LẬP VIỀN SẮC NÉT ---
 
-    // Cấp 1: Thành phố (Đường viền đậm nhất, bao quanh)
+    // Cấp 1: Toàn thành phố (Viền đen, dày nhất)
     gadm1_Layer
       .setStyle({
-        color: "#000000", // Màu đen cho rõ
+        color: "#000000", // Màu đen đậm
         weight: 3, // Độ dày 3px
-        opacity: 1, // Đậm đặc 100%
-        fillOpacity: 0, // Trong suốt để hiện heatmap bên dưới
-        interactive: false,
+        opacity: 1, // Không trong suốt
+        fillOpacity: 0, // Trong suốt phần ruột để hiện heatmap bên dưới
+        interactive: false, // Không chặn click chuột vào trạm
       })
       .clearLayers()
       .addData(g1)
       .addTo(map);
 
-    // Cấp 2: Quận/Huyện (Đường viền vừa)
+    // Cấp 2: Quận/Huyện (Viền xám đậm, vừa)
     gadm2_Layer
       .setStyle({
-        color: "#4b5563", // Màu xám đậm
+        color: "#374151", // Màu xám đậm
         weight: 1.5, // Độ dày 1.5px
-        opacity: 0.8, // Hơi nhạt hơn cấp 1 tí
+        opacity: 0.9,
         fillOpacity: 0,
         interactive: false,
       })
       .clearLayers()
       .addData(g2);
 
-    // Cấp 3: Phường/Xã (Đường viền mảnh nhất)
+    // Cấp 3: Phường/Xã (Viền mảnh, nhạt)
     gadm3_Layer
       .setStyle({
         color: "#9ca3af", // Màu xám nhạt
-        weight: 0.8, // Độ dày 0.8px
-        opacity: 0.5,
+        weight: 0.8, // Độ dày mảnh
+        opacity: 0.6,
         fillOpacity: 0,
         interactive: false,
       })
       .clearLayers()
       .addData(g3);
 
-    // Vẽ heatmap lấy ranh giới g1 làm khuôn
+    // Vẽ heatmap dùng ranh giới cấp 1 làm khuôn
     drawHeatmap(g1);
   } catch (err) {
     console.error("Lỗi load GADM:", err);
