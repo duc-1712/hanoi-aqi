@@ -819,49 +819,45 @@ async function loadGADMData() {
 }
 
 async function drawHeatmap(boundaryData) {
-  if (!allStations || allStations.length < 2) return;
+  if (allStations.length < 2) return;
   heatmapLayer.clearLayers();
 
   try {
-    // CHỐT HẠ: Ép kiểu tọa độ về Number và lọc các trạm lỗi
     const validPoints = allStations
-      .filter((st) => st.lat && st.lon && !isNaN(st.lat) && !isNaN(st.lon)) // Bỏ qua trạm thiếu tọa độ
-      .map((st) => {
-        return turf.point([parseFloat(st.lon), parseFloat(st.lat)], {
-          aqi: parseFloat(st.aqi) || 0,
-        });
-      });
-
-    if (validPoints.length < 2) {
-      console.warn("Không đủ dữ liệu trạm hợp lệ để vẽ heatmap.");
-      return;
-    }
+      .filter((st) => st.lat && st.lon)
+      .map((st) =>
+        turf.point([parseFloat(st.lon), parseFloat(st.lat)], {
+          aqi: parseFloat(st.aqi),
+        }),
+      );
 
     const points = turf.featureCollection(validPoints);
 
-    // Nội suy IDW (Lưới 2km - ông có thể chỉnh 1.5 để mịn hơn nhưng sẽ lag hơn)
+    // 1. CHỈNH ĐỘ DÀY LƯỚI: Thay 2km bằng 0.5km hoặc 1km để lưới dày hơn
     const options = {
       gridType: "points",
       property: "aqi",
       units: "kilometers",
     };
-    const grid = turf.interpolate(points, 2, options);
+    const grid = turf.interpolate(points, 1, options); // Giảm xuống 1km
 
-    // Cắt lưới theo ranh giới Hà Nội đã load thành công
     const clipped = turf.pointsWithinPolygon(grid, boundaryData);
 
     L.geoJson(clipped, {
       pointToLayer: (feature, latlng) => {
         return L.circleMarker(latlng, {
-          radius: 35, // Tăng radius để các quầng màu quyện vào nhau
+          // 2. TĂNG BÁN KÍNH: Để các vòng tròn gối đầu lên nhau
+          radius: 35,
           fillColor: getAQIColor(feature.properties.aqi),
           color: "none",
-          fillOpacity: 0.5,
+          // 3. GIẢM OPACITY: Để khi chồng lên nhau màu sẽ đậm dần (tạo hiệu ứng nhiệt)
+          fillOpacity: 0.2,
         });
       },
     }).addTo(heatmapLayer);
 
-    console.log("Đã vẽ xong Heatmap với " + validPoints.length + " trạm.");
+    // Mẹo nhỏ: Thêm filter mờ cho cả Layer nếu muốn mượt nữa
+    heatmapLayer.getPane().style.filter = "blur(15px)";
   } catch (err) {
     console.error("Lỗi vẽ heatmap:", err);
   }
