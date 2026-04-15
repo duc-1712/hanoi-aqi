@@ -90,6 +90,18 @@ function getAQIInfo(aqi) {
       "Báo động đỏ! Ảnh hưởng nghiêm trọng đến sức khỏe mọi người. Tuyệt đối không ra ngoài.",
   };
 }
+// --- LAYER CONTROL ---
+const baseMaps = {
+  "Bản đồ nền": osmLayer,
+};
+
+const overlayMaps = {
+  "Chỉ số trạm": markersLayer,
+  "Vùng ô nhiễm (Heatmap)": heatmapLayer,
+  "Ranh giới hành chính": gadmLayer,
+};
+
+L.control.layers(baseMaps, overlayMaps).addTo(map);
 // --- VẼ BIỂU ĐỒ LINE (HOURLY) ---
 function renderLineChart(domId, title, color, labels, values) {
   const dom = document.getElementById(domId);
@@ -343,7 +355,64 @@ document.addEventListener("click", (e) => {
       : loadHourlyHistory(currentStationName);
   }
 });
+async function drawHeatmap() {
+  // 1. Lấy dữ liệu trạm và ranh giới Hà Nội
+  const stations = await fetch(API_URL).then((res) => res.json());
+  const hanoiBoundary = await fetch("data/hanoi_boundary.json").then((res) =>
+    res.json(),
+  );
 
+  // 2. Tạo tập hợp các điểm để nội suy
+  const points = turf.featureCollection(
+    stations.map((st) => turf.point([st.lon, st.lat], { aqi: st.aqi })),
+  );
+
+  // 3. Nội suy IDW (Tạo lưới 1km)
+  const options = { gridType: "points", property: "aqi", units: "kilometers" };
+  const grid = turf.interpolate(points, 1, options);
+
+  // 4. Cắt lưới theo ranh giới Hà Nội (Để màu không bị tràn ra ngoài)
+  const clipped = turf.pointsWithinPolygon(grid, hanoiBoundary);
+
+  // 5. Vẽ lên Leaflet
+  L.geoJson(clipped, {
+    pointToLayer: (feature, latlng) => {
+      return L.circleMarker(latlng, {
+        radius: 15, // Chỉnh radius lớn để các quầng màu chạm vào nhau
+        fillColor: getAQIColor(feature.properties.aqi),
+        color: "none",
+        fillOpacity: 0.5,
+      });
+    },
+  }).addTo(map);
+}
+function findNearest() {
+  map.locate({ setView: true, maxZoom: 15 });
+
+  map.on("locationfound", (e) => {
+    const userLoc = e.latlng;
+    let minDest = Infinity;
+    let nearestSt = null;
+
+    // Giả sử 'allStations' là mảng chứa dữ liệu 4 trạm của bạn
+    allStations.forEach((st) => {
+      const dist = userLoc.distanceTo([st.lat, st.lon]);
+      if (dist < minDest) {
+        minDest = dist;
+        nearestSt = st;
+      }
+    });
+
+    if (nearestSt) {
+      L.popup()
+        .setLatLng(userLoc)
+        .setContent(
+          `Bạn đang ở đây. Trạm gần nhất là <b>${nearestSt.name}</b> (${(minDest / 1000).toFixed(2)} km) có AQI là ${nearestSt.aqi}`,
+        )
+        .openOn(map);
+    }
+  });
+}
 // --- DỌN DẸP ---
 window.addEventListener("beforeunload", () => {
   Object.values(chartInstances).forEach((c) => c?.dispose());
