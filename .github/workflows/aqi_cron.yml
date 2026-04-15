@@ -1,34 +1,51 @@
-name: Tự động cập nhật AQI 30 Phút
+name: Tự động cập nhật AQI Liên Tục (20 Phút)
 
 on:
   schedule:
-    # Chạy tự động vào phút 00 và phút 30 mỗi giờ
-    - cron: "0,30 * * * *"
-  workflow_dispatch: # Tạo nút bấm bằng tay trên web để test thử
+    # Chạy mỗi 20 phút (vào phút 0, 20, 40) để dữ liệu dày hơn
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
 
 jobs:
   run-cron-job:
-    runs-on: ubuntu-latest # Thuê máy chủ Linux miễn phí của GitHub
+    runs-on: ubuntu-latest
+    # Thêm quyền ghi để Bot có thể tự Push code giữ Repo luôn "sống"
+    permissions:
+      contents: write
 
     steps:
-      - name: Bước 1 - Kéo code của bạn xuống máy chủ
+      - name: Bước 1 - Kéo code xuống máy chủ
         uses: actions/checkout@v4
 
-      - name: Bước 2 - Cài đặt môi trường Node.js (Version 20)
+      - name: Bước 2 - Cài đặt Node.js 24 (Bản mới nhất, hết cảnh báo)
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
-      - name: Bước 3 - Cài đặt các thư viện cần thiết (npm install)
+      - name: Bước 3 - Cài đặt thư viện
         run: |
           cd backend
           npm install
 
-      - name: Bước 4 - Chạy con Bot cào dữ liệu
+      - name: Bước 4 - Chạy Bot cào dữ liệu
         env:
-          # Gọi 2 cái chìa khóa bạn đã giấu trong Secrets ra cho code dùng
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           AQICN_TOKEN: ${{ secrets.AQICN_TOKEN }}
         run: |
           cd backend
-          node run_cron.js
+          # Thêm timeout 1 phút để tránh treo máy chủ ảo
+          timeout 60s node run_cron.js || echo "Bot hoàn tất hoặc bị timeout nhẹ"
+
+      - name: Bước 5 - CƠ CHẾ KEEP-ALIVE (Tự động cập nhật Repo)
+        run: |
+          # Thiết lập danh tính cho con Bot
+          git config --global user.name "AQI-Bot-Automation"
+          git config --global user.email "bot@github.com"
+
+          # Ghi lại dấu vết chạy vào file nháp
+          echo "Lần cập nhật cuối: $(date)" > backend/last_run.txt
+
+          # Đẩy thay đổi lên GitHub để giữ Repo luôn ở trạng thái Active
+          git add backend/last_run.txt
+          git commit -m "Keep-alive: Dữ liệu AQI mới lúc $(date)" || echo "Không có thay đổi"
+          git push

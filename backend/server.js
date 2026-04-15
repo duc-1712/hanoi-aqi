@@ -6,7 +6,7 @@ import { pool } from "./db.js";
 import { updateAQIData } from "./fetch_aqi.js";
 import cron from "node-cron";
 
-//node server.js / chạy localhost:10000 test api: localhost:10000/api/stations
+//node --env-file=.env server.js / chạy localhost:10000 test api: localhost:10000/api/stations
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
