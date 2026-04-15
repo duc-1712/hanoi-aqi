@@ -216,8 +216,9 @@ async function loadStations() {
       // --- 2. MARKER TÀNG HÌNH ĐỂ CLICK ---
       const marker = L.circleMarker([st.lat, st.lon], {
         radius: 15,
-        opacity: 0, // Giấu viền
-        fillOpacity: 0, // Giấu màu nền
+        opacity: 1, // Giấu viền
+        fillOpacity: 0.8,
+        fillColor: color,
       }).addTo(markersLayer);
 
       const info = getAQIInfo(st.aqi);
