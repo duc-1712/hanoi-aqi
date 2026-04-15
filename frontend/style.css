@@ -151,14 +151,47 @@ header h1 {
     text-align: center;
 }
 
-/* MÀU AQI CHUẨN */
-.aqi-good       { --aqi-color:#00e400; --aqi-color-dark:#00c000; }
-.aqi-moderate   { --aqi-color:#ffff00; --aqi-color-dark:#dddd00; }
-.aqi-moderate .st-aqi { color:#222 !important; text-shadow:none; }
-.aqi-unhealthy  { --aqi-color:#ff7e00; --aqi-color-dark:#e66e00; }
-.aqi-bad        { --aqi-color:#ff0000; --aqi-color-dark:#cc0000; }
-.aqi-verybad    { --aqi-color:#8f3f97; --aqi-color-dark:#7a2f82; }
-.aqi-hazardous  { --aqi-color:#7e0023; --aqi-color-dark:#5e001a; }
+.aqi-good { 
+    --aqi-color: #00e400; 
+    --aqi-color-dark: #00c000; 
+    border-left: 6px solid #00e400 !important;
+}
+
+.aqi-moderate { 
+    --aqi-color: #ffff00; 
+    --aqi-color-dark: #dddd00; 
+    border-left: 6px solid #ffff00 !important;
+}
+
+.aqi-moderate .st-aqi { 
+    color: #333 !important; 
+    text-shadow: none !important; 
+    background: linear-gradient(135deg, #ffff00, #dddd00) !important;
+}
+
+.aqi-unhealthy { 
+    --aqi-color: #ff7e00; 
+    --aqi-color-dark: #e66e00; 
+    border-left: 6px solid #ff7e00 !important;
+}
+
+.aqi-bad { 
+    --aqi-color: #ff0000; 
+    --aqi-color-dark: #cc0000; 
+    border-left: 6px solid #ff0000 !important;
+}
+
+.aqi-verybad { 
+    --aqi-color: #8f3f97; 
+    --aqi-color-dark: #7a2f82; 
+    border-left: 6px solid #8f3f97 !important;
+}
+
+.aqi-hazardous { 
+    --aqi-color: #7e0023; 
+    --aqi-color-dark: #5e001a; 
+    border-left: 6px solid #7e0023 !important;
+}
 
 .legend-box { 
     padding: 15px; 
