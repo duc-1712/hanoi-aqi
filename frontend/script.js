@@ -91,13 +91,14 @@ function getAQIInfo(aqi) {
   };
 }
 // --- LAYER CONTROL ---
-
-const overlayMaps = {
-  "Chỉ số trạm": markersLayer,
-  "Vùng ô nhiễm (Heatmap)": heatmapLayer,
-  "Ranh giới hành chính": gadmLayer,
+const stationsLayer = L.layerGroup().addTo(map); // Layer chứa các chấm trạm
+const heatmapLayer = L.layerGroup(); // Layer chứa các quầng màu
+const gadmLayer = L.geoJson(gadmData); // Layer ranh giới Quận/Huyện
+const overlays = {
+  "<span style='color: #ef4444'>●</span> Trạm quan trắc": stationsLayer,
+  "<span style='color: #f59e0b'>✦</span> Bản đồ nhiệt (Heatmap)": heatmapLayer,
+  "<span style='color: #10b981'>■</span> Ranh giới hành chính": gadmLayer,
 };
-
 L.control.layers(baseMaps, overlayMaps).addTo(map);
 // --- VẼ BIỂU ĐỒ LINE (HOURLY) ---
 function renderLineChart(domId, title, color, labels, values) {
