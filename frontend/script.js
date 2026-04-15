@@ -806,45 +806,43 @@ async function loadGADMData() {
     const g2 = await res2.json();
     const g3 = await res3.json();
 
-    // --- THIẾT LẬP VIỀN SẮC NÉT ---
-
-    // Cấp 1: Toàn thành phố (Viền đen, dày nhất)
+    // Cấp 1: Thành phố (Cái khung to nhất bao quanh)
     gadm1_Layer
       .setStyle({
-        color: "#000000", // Màu đen đậm
-        weight: 3, // Độ dày 3px
-        opacity: 1, // Không trong suốt
-        fillOpacity: 0, // Trong suốt phần ruột để hiện heatmap bên dưới
+        color: "#000000", // Đen đặc cho uy tín
+        weight: 4, // Viền rất dày để làm khung ngoài
+        opacity: 1,
+        fillOpacity: 0, // TRONG SUỐT HOÀN TOÀN để nhìn xuyên qua
         interactive: false, // Không chặn click chuột vào trạm
       })
       .clearLayers()
       .addData(g1)
       .addTo(map);
 
-    // Cấp 2: Quận/Huyện (Viền xám đậm, vừa)
+    // Cấp 2: Quận/Huyện (Viền phân chia nội bộ)
     gadm2_Layer
       .setStyle({
-        color: "#374151", // Màu xám đậm
-        weight: 1.5, // Độ dày 1.5px
-        opacity: 0.9,
-        fillOpacity: 0,
+        color: "#334155", // Xám đen (Dark Slate)
+        weight: 2, // Độ dày vừa phải
+        opacity: 1,
+        fillOpacity: 0, // TRONG SUỐT
         interactive: false,
       })
       .clearLayers()
       .addData(g2);
 
-    // Cấp 3: Phường/Xã (Viền mảnh, nhạt)
+    // Cấp 3: Phường/Xã (Viền chi tiết nhỏ)
     gadm3_Layer
       .setStyle({
-        color: "#9ca3af", // Màu xám nhạt
-        weight: 0.8, // Độ dày mảnh
+        color: "#94a3b8", // Xám nhạt (Slate)
+        weight: 1, // Viền mảnh
         opacity: 0.6,
-        fillOpacity: 0,
+        dashArray: "3, 5", // Nét đứt nhìn cho nó chuyên nghiệp
+        fillOpacity: 0, // TRONG SUỐT
         interactive: false,
       })
       .clearLayers()
       .addData(g3);
-
     // Vẽ heatmap dùng ranh giới cấp 1 làm khuôn
     drawHeatmap(g1);
   } catch (err) {
