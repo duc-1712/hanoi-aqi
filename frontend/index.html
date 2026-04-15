@@ -7,23 +7,21 @@
   <title>Giám sát chất lượng không khí Hà Nội</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <link rel="stylesheet" href="style.css" />
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-  <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
   <header>
     <div class="header-content">
-      <h1>Chất lượng không khí Hà Nội</h1>
+      <h1><i class="fa-solid fa-wind"></i> Chất lượng không khí Hà Nội</h1>
       <button id="toggle-sidebar" title="Ẩn/Hiện danh sách"><i class="fa-solid fa-bars"></i></button>
-    </div>
-    <div id="map-controls">
-      <button id="btn-locate" class="gis-button" onclick="findNearest()">
-        <i class="fa-solid fa-location-crosshairs"></i> Tìm trạm gần tôi
-      </button>
     </div>
   </header>
 
@@ -41,7 +39,7 @@
         <h3>Thang màu AQI</h3>
         <div class="legend-grid">
           <div><span class="dot" style="background:#00e400"></span> Tốt (0–50)</div>
-          <div><span class="dot" style="background:#ffff00"></span> Trung bình (51–100)</div>
+          <div><span class="dot" style="background:#ffff00; border: 1px solid #ccc;"></span> Trung bình (51–100)</div>
           <div><span class="dot" style="background:#ff7e00"></span> Kém (101–150)</div>
           <div><span class="dot" style="background:#ff0000"></span> Xấu (151–200)</div>
           <div><span class="dot" style="background:#8f3f97"></span> Rất xấu (201–300)</div>
@@ -49,7 +47,14 @@
         </div>
       </div>
     </aside>
-    <main id="map"></main>
+
+    <main id="map">
+      <div id="map-controls">
+        <button id="btn-locate" class="gis-button" onclick="findNearest()">
+          <i class="fa-solid fa-location-crosshairs"></i> Tìm trạm gần tôi
+        </button>
+      </div>
+    </main>
   </div>
 
   <div id="bottom-container">
@@ -61,7 +66,7 @@
         </div>
 
         <div id="chart-instruction">
-          <p>Chọn một trạm trên bản đồ để xem chi tiết</p>
+          <p><i class="fa-solid fa-circle-info"></i> Chọn một trạm trên bản đồ hoặc danh sách để xem chi tiết</p>
         </div>
 
         <div id="charts-wrapper" class="hidden">
@@ -104,12 +109,9 @@
           </div>
 
           <div id="tab-daily" class="tab-content">
-            <div
-              style="background:#fff;border-radius:16px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.12);margin-bottom:20px;">
-              <h3 style="text-align:center;margin:0 0 20px;color:#1f2937;font-weight:700;font-size:1.4rem;">
-                AQI trung bình theo ngày
-              </h3>
-              <div id="chart-daily-aqi" style="width:100%;height:460px;"></div>
+            <div class="daily-chart-container">
+              <h3>AQI trung bình theo ngày</h3>
+              <div id="chart-daily-aqi" style="width:100%;height:400px;"></div>
             </div>
           </div>
         </div>
@@ -166,11 +168,10 @@
             </tr>
           </tbody>
         </table>
-        <p class="note">(*): Dấu (-) là không quy định.</p>
 
         <div id="current-stats" class="hidden">
-          <h3 style="margin:20px 0 10px;border-top:1px dashed #ddd;padding-top:15px;">Chỉ số hiện tại</h3>
-          <div id="aqi-advice-text" style="margin-bottom: 15px;"></div>
+          <h3 class="stat-title">Chỉ số hiện tại</h3>
+          <div id="aqi-advice-text" class="advice-box"></div>
           <div class="stat-grid">
             <div><span>AQI</span><strong id="val-aqi">--</strong></div>
             <div><span>PM2.5</span><strong id="val-pm25">--</strong></div>
@@ -186,7 +187,8 @@
   </div>
 
   <footer>
-    <p>Nguồn: <a href="https://aqicn.org" target="_blank">AQICN</a> • Cập nhật mỗi 30 phút</p>
+    <p>Nguồn dữ liệu: <a href="https://aqicn.org" target="_blank">WAQI API</a> • Hệ thống WebGIS Hanoi-AQI &copy; 2026
+    </p>
   </footer>
 
   <script src="script.js" defer></script>
