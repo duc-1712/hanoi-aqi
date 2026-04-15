@@ -453,6 +453,11 @@ let gadm3_Layer = L.geoJson(null, {
 
 // --- KHỞI TẠO BẢN ĐỒ ---
 const map = L.map("map").setView([21.0285, 105.8542], 12);
+map.createPane("heatmapPane");
+map.getPane("heatmapPane").style.zIndex = 350; // Đặt thấp hơn các lớp khác
+map.getPane("heatmapPane").style.pointerEvents = "none"; // Không cản trở click marker
+
+map.getPane("heatmapPane").style.filter = "blur(15px)";
 const osmTile = L.tileLayer(
   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
   {
@@ -807,7 +812,12 @@ async function loadGADMData() {
     const g1 = await res1.json();
     const g2 = await res2.json();
     const g3 = await res3.json();
-
+    gadm1_Layer.setStyle({
+      color: "#333", // Màu xám đậm hoặc đen cho sắc nét
+      weight: 2, // Độ dày đường viền
+      fillOpacity: 0, // Trong suốt để nhìn thấy heatmap bên dưới
+      interactive: false,
+    });
     gadm1_Layer.clearLayers().addData(g1).addTo(map);
     gadm2_Layer.clearLayers().addData(g2);
     gadm3_Layer.clearLayers().addData(g3);
@@ -844,6 +854,7 @@ async function drawHeatmap(boundaryData) {
     const clipped = turf.pointsWithinPolygon(grid, boundaryData);
 
     L.geoJson(clipped, {
+      pane: "heatmapPane",
       pointToLayer: (feature, latlng) => {
         return L.circleMarker(latlng, {
           // 2. TĂNG BÁN KÍNH: Để các vòng tròn gối đầu lên nhau
@@ -856,7 +867,6 @@ async function drawHeatmap(boundaryData) {
       },
     }).addTo(heatmapLayer);
 
-    // Mẹo nhỏ: Thêm filter mờ cho cả Layer nếu muốn mượt nữa
     heatmapLayer.getPane().style.filter = "blur(15px)";
   } catch (err) {
     console.error("Lỗi vẽ heatmap:", err);
