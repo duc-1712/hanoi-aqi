@@ -91,9 +91,6 @@ function getAQIInfo(aqi) {
   };
 }
 // --- LAYER CONTROL ---
-const baseMaps = {
-  "Bản đồ nền": osmLayer,
-};
 
 const overlayMaps = {
   "Chỉ số trạm": markersLayer,
