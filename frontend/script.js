@@ -433,12 +433,12 @@
 const API_URL = "http://localhost:10000/api/stations";
 const HISTORY_API_URL = "http://localhost:10000/api/history";
 
-// --- BIẾN TOÀN CỤC (GIỮ NGUYÊN) ---
+// --- BIẾN TOÀN CỤC ---
 let allStations = [];
 let chartInstances = {};
 let currentStationName = "";
 
-// Các lớp GIS bổ sung
+// Lớp chứa dữ liệu GIS bổ sung
 let markersLayer = L.layerGroup();
 let heatmapLayer = L.layerGroup();
 let gadm1_Layer = L.geoJson(null, {
@@ -451,7 +451,7 @@ let gadm3_Layer = L.geoJson(null, {
   style: { color: "#93c5fd", weight: 1, fillOpacity: 0 },
 });
 
-// --- KHỞI TẠO BẢN ĐỒ (GIỮ NGUYÊN) ---
+// --- KHỞI TẠO BẢN ĐỒ ---
 const map = L.map("map").setView([21.0285, 105.8542], 12);
 const osmTile = L.tileLayer(
   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -460,7 +460,7 @@ const osmTile = L.tileLayer(
   },
 ).addTo(map);
 
-// Lớp WMS từ GeoServer
+// Lớp WMS từ GeoServer (GIỮ NGUYÊN CỦA ÔNG)
 const geoserverLayer = L.tileLayer.wms(
   "http://localhost:8080/geoserver/hanoi_aqi/wms",
   {
@@ -478,7 +478,7 @@ markersLayer.addTo(map);
 gadm1_Layer.addTo(map);
 heatmapLayer.addTo(map);
 
-// --- LAYER CONTROL (ĐỊNH NGHĨA baseMaps TRƯỚC KHI GỌI) ---
+// --- LAYER CONTROL ---
 const baseMaps = { "Bản đồ nền": osmTile };
 const overlayMaps = {
   "<span style='color: #ef4444'>●</span> Trạm quan trắc": markersLayer,
@@ -490,7 +490,7 @@ const overlayMaps = {
 };
 L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
-// --- MÀU AQI CHUẨN (GIỮ NGUYÊN 100% KHÔNG THIẾU 1 CHỮ) ---
+// --- MÀU AQI CHUẨN (GIỮ NGUYÊN 100%) ---
 function getAQIColor(aqi) {
   if (!aqi || aqi < 5) return "#94a3b8";
   if (aqi <= 50) return "#00e400";
@@ -511,6 +511,7 @@ function getAQIClass(aqi) {
   return "aqi-hazardous";
 }
 
+// --- LỜI KHUYÊN (GIỮ NGUYÊN 100% KHÔNG THIẾU 1 CHỮ) ---
 function getAQIInfo(aqi) {
   if (!aqi || aqi < 5)
     return { level: "Không xác định", advice: "Chưa có dữ liệu đánh giá." };
@@ -696,7 +697,7 @@ async function selectStation(st) {
   document.getElementById("selected-station-name").textContent = st.name;
   document.getElementById("current-stats").classList.remove("hidden");
 
-  // HIỆN LỜI KHUYÊN VÀO ADVICE BOX
+  // HIỆN LỜI KHUYÊN VÀO ADVICE BOX (ID: aqi-advice-text)
   const info = getAQIInfo(st.aqi);
   const adviceBox = document.getElementById("aqi-advice-text");
   if (adviceBox) {
@@ -769,7 +770,7 @@ async function loadDailyHistory(name) {
   }
 }
 
-// --- CHUYỂN TAB (GIỮ NGUYÊN) ---
+// --- CHUYỂN TAB ---
 document.addEventListener("click", (e) => {
   if (!e.target.matches(".tab-btn")) return;
   document
@@ -788,9 +789,10 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// --- GIS - GADM & HEATMAP (SỬA ĐUÔI .GEOJSON VÀ ĐƯỜNG DẪN) ---
+// --- GIS - GADM & HEATMAP ---
 async function loadGADMData() {
   try {
+    // SỬA ĐƯỜNG DẪN: Nếu folder geodata nằm ngang hàng index.html
     const [res1, res2, res3] = await Promise.all([
       fetch("geodata/Hanoi_gadm_1.geojson"),
       fetch("geodata/Hanoi_gadm_2.geojson"),
@@ -798,7 +800,9 @@ async function loadGADMData() {
     ]);
 
     if (!res1.ok)
-      throw new Error("Kiểm tra lại file geodata/Hanoi_gadm_1.geojson");
+      throw new Error(
+        "Kiểm tra lại file Hanoi_gadm_1.geojson trong folder geodata",
+      );
 
     const g1 = await res1.json();
     const g2 = await res2.json();
