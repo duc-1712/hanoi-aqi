@@ -821,25 +821,47 @@ async function loadGADMData() {
 async function drawHeatmap(boundaryData) {
   if (!allStations || allStations.length < 2) return;
   heatmapLayer.clearLayers();
+
   try {
-    const points = turf.featureCollection(
-      allStations.map((st) => turf.point([st.lon, st.lat], { aqi: st.aqi })),
-    );
-    const grid = turf.interpolate(points, 2, {
+    // CHỐT HẠ: Ép kiểu tọa độ về Number và lọc các trạm lỗi
+    const validPoints = allStations
+      .filter((st) => st.lat && st.lon && !isNaN(st.lat) && !isNaN(st.lon)) // Bỏ qua trạm thiếu tọa độ
+      .map((st) => {
+        return turf.point([parseFloat(st.lon), parseFloat(st.lat)], {
+          aqi: parseFloat(st.aqi) || 0,
+        });
+      });
+
+    if (validPoints.length < 2) {
+      console.warn("Không đủ dữ liệu trạm hợp lệ để vẽ heatmap.");
+      return;
+    }
+
+    const points = turf.featureCollection(validPoints);
+
+    // Nội suy IDW (Lưới 2km - ông có thể chỉnh 1.5 để mịn hơn nhưng sẽ lag hơn)
+    const options = {
       gridType: "points",
       property: "aqi",
       units: "kilometers",
-    });
+    };
+    const grid = turf.interpolate(points, 2, options);
+
+    // Cắt lưới theo ranh giới Hà Nội đã load thành công
     const clipped = turf.pointsWithinPolygon(grid, boundaryData);
+
     L.geoJson(clipped, {
-      pointToLayer: (feature, latlng) =>
-        L.circleMarker(latlng, {
-          radius: 25,
+      pointToLayer: (feature, latlng) => {
+        return L.circleMarker(latlng, {
+          radius: 35, // Tăng radius để các quầng màu quyện vào nhau
           fillColor: getAQIColor(feature.properties.aqi),
           color: "none",
-          fillOpacity: 0.45,
-        }),
+          fillOpacity: 0.5,
+        });
+      },
     }).addTo(heatmapLayer);
+
+    console.log("Đã vẽ xong Heatmap với " + validPoints.length + " trạm.");
   } catch (err) {
     console.error("Lỗi vẽ heatmap:", err);
   }
