@@ -430,21 +430,29 @@
 //   const firstStation = document.querySelector(".station-card");
 //   if (firstStation) firstStation.click();
 // }, 2000);
-// --- CẤU HÌNH API ---
 const API_URL = "http://localhost:10000/api/stations";
 const HISTORY_API_URL = "http://localhost:10000/api/history";
 
-// --- KHỞI TẠO BẢN ĐỒ ---
-const map = L.map("map").setView([21.0285, 105.8542], 12);
+// --- BIẾN TOÀN CỤC BỔ SUNG ---
+let allStations = []; // Lưu dữ liệu để dùng cho hàm tìm trạm gần nhất
+let heatmapLayer = L.layerGroup(); // Layer cho Heatmap
+let gadmLayer = L.geoJson(null); // Layer cho GADM
 
-const osmLayer = L.tileLayer(
+// --- BẢN ĐỒ NỀN ---
+const osmTile = L.tileLayer(
   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
   {
     attribution: "&copy; OpenStreetMap",
   },
-).addTo(map);
+);
 
-// Lớp WMS từ GeoServer (Để hiển thị dữ liệu tĩnh nếu cần)
+const map = L.map("map", {
+  center: [21.0285, 105.8542],
+  zoom: 12,
+  layers: [osmTile], // Add nền mặc định
+});
+
+// Lớp WMS từ GeoServer
 const geoserverLayer = L.tileLayer.wms(
   "http://localhost:8080/geoserver/hanoi_aqi/wms",
   {
@@ -453,34 +461,15 @@ const geoserverLayer = L.tileLayer.wms(
     format: "image/png",
     transparent: true,
     version: "1.1.0",
+    zIndex: 1000,
   },
 );
 
-// --- CÁC LỚP DỮ LIỆU (LAYERS) ---
 const markersLayer = L.layerGroup().addTo(map);
-const heatmapLayer = L.layerGroup().addTo(map); // Layer cho Heatmap
-let gadmLayer = L.geoJson(null); // Khởi tạo rỗng cho ranh giới GADM
-
-// Biến toàn cục lưu trữ dữ liệu để dùng cho chức năng "Tìm trạm gần nhất"
-let allStations = [];
 let chartInstances = {};
 let currentStationName = "";
 
-// --- QUẢN LÝ LỚP PHỦ (LAYER CONTROL) ---
-const baseMaps = {
-  "Bản đồ nền": osmLayer,
-};
-
-const overlayMaps = {
-  "<span style='color: #ef4444'>●</span> Trạm quan trắc": markersLayer,
-  "<span style='color: #f59e0b'>✦</span> Bản đồ nhiệt (Heatmap)": heatmapLayer,
-  "<span style='color: #10b981'>■</span> Ranh giới hành chính": gadmLayer,
-  "Lớp GeoServer": geoserverLayer,
-};
-
-L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
-
-// --- CÁC HÀM TIỆN ÍCH AQI ---
+// --- MÀU AQI CHUẨN (GIỮ NGUYÊN) ---
 function getAQIColor(aqi) {
   if (!aqi || aqi < 5) return "#94a3b8";
   if (aqi <= 50) return "#00e400";
@@ -503,130 +492,296 @@ function getAQIClass(aqi) {
 
 function getAQIInfo(aqi) {
   if (!aqi || aqi < 5)
-    return { level: "Không xác định", advice: "Chưa có dữ liệu." };
+    return { level: "Không xác định", advice: "Chưa có dữ liệu đánh giá." };
   if (aqi <= 50)
     return {
       level: "Tốt",
-      advice: "Không khí trong lành. Hoạt động bình thường.",
+      advice:
+        "Không khí trong lành. Bạn có thể hoạt động ngoài trời bình thường.",
     };
   if (aqi <= 100)
-    return { level: "Trung bình", advice: "Chất lượng chấp nhận được." };
+    return {
+      level: "Trung bình",
+      advice:
+        "Chất lượng chấp nhận được. Nhóm nhạy cảm nên cân nhắc giảm vận động mạnh ngoài trời.",
+    };
   if (aqi <= 150)
-    return { level: "Kém", advice: "Nhóm nhạy cảm nên hạn chế ra ngoài." };
+    return {
+      level: "Kém",
+      advice:
+        "Nhóm nhạy cảm cần hạn chế ra ngoài. Mọi người nên giảm vận động mạnh khi ở ngoài trời.",
+    };
   if (aqi <= 200)
-    return { level: "Xấu", advice: "Mọi người nên hạn chế ra ngoài." };
+    return {
+      level: "Xấu",
+      advice:
+        "Có hại cho sức khỏe. Mọi người nên hạn chế ra ngoài. Bắt buộc đeo khẩu trang chống bụi mịn khi ra đường.",
+    };
   if (aqi <= 300)
-    return { level: "Rất xấu", advice: "Cảnh báo khẩn cấp sức khỏe." };
-  return { level: "Nguy hại", advice: "Báo động đỏ! Không ra ngoài." };
+    return {
+      level: "Rất xấu",
+      advice:
+        "Cảnh báo khẩn cấp! Người dân nên ở trong nhà, đóng cửa sổ. Tránh mọi hoạt động ngoài trời.",
+    };
+  return {
+    level: "Nguy hại",
+    advice:
+      "Báo động đỏ! Ảnh hưởng nghiêm trọng đến sức khỏe mọi người. Tuyệt đối không ra ngoài.",
+  };
 }
 
-// --- LOAD TRẠM VÀ HIỂN THỊ ---
+// --- LAYER CONTROL (SỬA LẠI CHO ĐÚNG BIẾN) ---
+const baseMaps = {
+  "Bản đồ nền": osmTile,
+};
+const overlayMaps = {
+  "<span style='color: #ef4444'>●</span> Trạm quan trắc": markersLayer,
+  "<span style='color: #f59e0b'>✦</span> Bản đồ nhiệt (Heatmap)": heatmapLayer,
+  "<span style='color: #10b981'>■</span> Ranh giới hành chính": gadmLayer,
+  "GeoServer WMS": geoserverLayer,
+};
+L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+
+// --- VẼ BIỂU ĐỒ (GIỮ NGUYÊN TOÀN BỘ LOGIC CỦA BẠN) ---
+function renderLineChart(domId, title, color, labels, values) {
+  const dom = document.getElementById(domId);
+  if (!dom) return;
+  if (chartInstances[domId]) chartInstances[domId].dispose();
+  const chart = echarts.init(dom);
+  chartInstances[domId] = chart;
+  chart.setOption({
+    tooltip: { trigger: "axis" },
+    grid: { top: 30, bottom: 60, left: 50, right: 20 },
+    xAxis: {
+      type: "category",
+      data: labels,
+      axisLabel: { rotate: 45, fontSize: 11 },
+    },
+    yAxis: { type: "value" },
+    series: [
+      {
+        name: title,
+        type: "line",
+        smooth: true,
+        data: values,
+        itemStyle: { color },
+        lineStyle: { width: 3 },
+        areaStyle: { opacity: 0.15 },
+      },
+    ],
+  });
+  window.addEventListener("resize", () => chart.resize());
+}
+
+function renderDailyAQIChart(labels = [], values = []) {
+  const dom = document.getElementById("chart-daily-aqi");
+  if (!dom) return;
+  if (chartInstances["daily-aqi"]) chartInstances["daily-aqi"].dispose();
+  const chart = echarts.init(dom);
+  chartInstances["daily-aqi"] = chart;
+  if (!labels.length || !values.length) {
+    chart.clear();
+    return;
+  }
+  chart.setOption({
+    tooltip: { trigger: "axis", formatter: "<b>AQI {c}</b><br/>{b}" },
+    grid: { top: 60, bottom: 80, left: 60, right: 60 },
+    xAxis: {
+      type: "category",
+      data: labels,
+      axisLabel: {
+        fontSize: 14,
+        fontWeight: "bold",
+        color: "#333",
+        interval: 0,
+        rotate: labels.length > 5 ? 25 : 0,
+      },
+    },
+    yAxis: { type: "value", min: 0, max: 500, splitNumber: 10 },
+    series: [
+      {
+        type: "bar",
+        barWidth: "70%",
+        data: values.map((v) => ({
+          value: v || 0,
+          itemStyle: { color: getAQIColor(v) },
+        })),
+        label: {
+          show: true,
+          position: "top",
+          fontSize: 18,
+          fontWeight: "bold",
+          color: "#222",
+        },
+      },
+    ],
+  });
+  window.addEventListener("resize", () => chart.resize());
+}
+
+// --- LOAD TRẠM ---
 async function loadStations() {
   const list = document.getElementById("station-list");
   try {
     const res = await fetch(API_URL);
     const stations = await res.json();
-    allStations = stations; // Lưu vào biến toàn cục
+    allStations = stations; // Gán dữ liệu vào biến toàn cục
 
     list.innerHTML = "";
     markersLayer.clearLayers();
 
     stations.forEach((st) => {
       if (!st.aqi || st.aqi < 5) return;
-
       const color = getAQIColor(st.aqi);
       const aqiClass = getAQIClass(st.aqi);
 
-      // Render Sidebar
       const li = document.createElement("li");
       li.className = `station-card ${aqiClass}`;
       li.innerHTML = `<div class="st-name">${st.name}</div><div class="st-aqi">${st.aqi}</div>`;
       li.onclick = () => selectStation(st);
       list.appendChild(li);
 
-      // Render Marker (Tàng hình để nhận sự kiện)
       const marker = L.circleMarker([st.lat, st.lon], {
         radius: 15,
-        opacity: 0.3,
-        fillOpacity: 0.1,
+        opacity: 0.2,
+        fillOpacity: 0.01,
         fillColor: color,
-        color: color,
       }).addTo(markersLayer);
 
       const info = getAQIInfo(st.aqi);
-      marker.bindPopup(`
-                <div style="text-align:center; min-width: 180px;">
-                    <b>${st.name}</b><br>
-                    <span style="font-size:24px; font-weight:900; color:${color}">AQI ${st.aqi}</span><br>
-                    <div style="background:${color}; color:#fff; padding:2px 5px; border-radius:4px;">${info.level}</div>
-                </div>
-            `);
+      marker.bindPopup(`<div style="text-align:center; min-width: 200px;">
+          <b>${st.name}</b><br><span style="font-size:28px;font-weight:900;color:${color}">AQI ${st.aqi}</span><br>
+          <div style="background:${color}; color:#fff; padding:2px 8px; border-radius:4px; display:inline-block;">${info.level}</div>
+        </div>`);
       marker.on("click", () => selectStation(st));
     });
 
-    // Vẽ Heatmap sau khi đã có dữ liệu trạm
-    drawHeatmap();
+    drawHeatmap(); // Gọi heatmap sau khi load trạm xong
   } catch (err) {
-    list.innerHTML = "<li style='color:red'>Lỗi kết nối API</li>";
+    list.innerHTML =
+      "<li style='color:red;padding:20px'>Lỗi tải dữ liệu trạm</li>";
   }
 }
 
-// --- VẼ BẢN ĐỒ NHIỆT (HEATMAP) ---
-async function drawHeatmap() {
-  if (allStations.length === 0) return;
-  heatmapLayer.clearLayers();
+// --- CHỌN TRẠM (GIỮ NGUYÊN) ---
+async function selectStation(st) {
+  currentStationName = st.name;
+  document.getElementById("chart-instruction").classList.add("hidden");
+  document.getElementById("charts-wrapper").classList.remove("hidden");
+  document.getElementById("selected-station-name").textContent = st.name;
+  document.getElementById("current-stats").classList.remove("hidden");
 
+  ["aqi", "pm25", "pm10", "no2", "co", "so2", "o3"].forEach((k) => {
+    const el = document.getElementById(`val-${k}`);
+    if (el) {
+      el.textContent = st[k] !== null && st[k] !== undefined ? st[k] : "--";
+      if (k === "aqi") el.style.color = getAQIColor(st[k]);
+    }
+  });
+
+  map.flyTo([st.lat, st.lon], 16, { duration: 1.5 });
+  const isDaily =
+    document.querySelector(".tab-btn.active")?.dataset.tab === "daily";
+  isDaily ? loadDailyHistory(st.name) : loadHourlyHistory(st.name);
+}
+
+// --- LOAD LỊCH SỬ (GIỮ NGUYÊN) ---
+async function loadHourlyHistory(name) {
+  try {
+    const res = await fetch(
+      `${HISTORY_API_URL}?name=${encodeURIComponent(name)}`,
+    );
+    const d = await res.json();
+    if (!d.times?.length) return;
+    renderLineChart("chart-pm25", "PM2.5", "#3b82f6", d.times, d.pm25);
+    renderLineChart("chart-pm10", "PM10", "#10b981", d.times, d.pm10);
+    renderLineChart("chart-no2", "NO₂", "#f59e0b", d.times, d.no2);
+    renderLineChart("chart-co", "CO", "#ef4444", d.times, d.co);
+    renderLineChart("chart-o3", "O₃", "#8b5cf6", d.times, d.o3);
+    renderLineChart("chart-so2", "SO₂", "#6366f1", d.times, d.so2);
+  } catch (err) {
+    console.error("Lỗi hourly:", err);
+  }
+}
+
+async function loadDailyHistory(name) {
+  try {
+    const res = await fetch(
+      `${HISTORY_API_URL}?name=${encodeURIComponent(name)}&mode=daily`,
+    );
+    if (!res.ok) {
+      renderDailyAQIChart([], []);
+      return;
+    }
+    const d = await res.json();
+    renderDailyAQIChart(d.dates || [], d.aqi || []);
+  } catch (err) {
+    renderDailyAQIChart([], []);
+  }
+}
+
+// --- CHUYỂN TAB (GIỮ NGUYÊN) ---
+document.addEventListener("click", (e) => {
+  if (!e.target.matches(".tab-btn")) return;
+  document
+    .querySelectorAll(".tab-btn")
+    .forEach((b) => b.classList.remove("active"));
+  document
+    .querySelectorAll(".tab-content")
+    .forEach((c) => c.classList.remove("active"));
+  e.target.classList.add("active");
+  const tab = e.target.dataset.tab;
+  document.getElementById(`tab-${tab}`).classList.add("active");
+  if (currentStationName) {
+    tab === "daily"
+      ? loadDailyHistory(currentStationName)
+      : loadHourlyHistory(currentStationName);
+  }
+});
+
+// --- TÍNH NĂNG GIS BỔ SUNG ---
+async function drawHeatmap() {
   try {
     const response = await fetch("data/hanoi_boundary.json");
     const hanoiBoundary = await response.json();
+    gadmLayer.clearLayers().addData(hanoiBoundary); // Hiển thị ranh giới lên map
 
-    // Cập nhật lớp GADM nếu cần hiển thị ranh giới
-    gadmLayer.addData(hanoiBoundary);
+    if (allStations.length < 2) return;
+    heatmapLayer.clearLayers();
 
-    // Chuyển trạm thành điểm Turf
     const points = turf.featureCollection(
       allStations.map((st) => turf.point([st.lon, st.lat], { aqi: st.aqi })),
     );
 
-    // Nội suy IDW (Lưới 1km)
     const options = {
       gridType: "points",
       property: "aqi",
       units: "kilometers",
-      weight: 1.5,
     };
     const grid = turf.interpolate(points, 1, options);
-
-    // Cắt theo ranh giới Hà Nội
     const clipped = turf.pointsWithinPolygon(grid, hanoiBoundary);
 
-    // Vẽ lên heatmapLayer
     L.geoJson(clipped, {
       pointToLayer: (feature, latlng) => {
-        const aqi = feature.properties.aqi;
         return L.circleMarker(latlng, {
-          radius: 18,
-          fillColor: getAQIColor(aqi),
+          radius: 20,
+          fillColor: getAQIColor(feature.properties.aqi),
           color: "none",
-          fillOpacity: 0.4,
+          fillOpacity: 0.5,
         });
       },
     }).addTo(heatmapLayer);
   } catch (err) {
-    console.error("Lỗi vẽ heatmap:", err);
+    console.error("Heatmap error:", err);
   }
 }
 
-// --- TÌM TRẠM GẦN NHẤT ---
 function findNearest() {
   map.locate({ setView: true, maxZoom: 15 });
-
   map.on("locationfound", (e) => {
     const userLoc = e.latlng;
     let minDest = Infinity;
     let nearestSt = null;
-
-    if (allStations.length === 0) return;
 
     allStations.forEach((st) => {
       const dist = userLoc.distanceTo([st.lat, st.lon]);
@@ -640,105 +795,28 @@ function findNearest() {
       L.popup()
         .setLatLng(userLoc)
         .setContent(
-          `Bạn đang ở đây.<br>Trạm gần nhất: <b>${nearestSt.name}</b><br>Khoảng cách: ${(minDest / 1000).toFixed(2)} km`,
+          `Trạm gần bạn nhất: <b>${nearestSt.name}</b> (${(minDest / 1000).toFixed(2)} km)`,
         )
         .openOn(map);
-
-      // Tự động chọn trạm đó luôn
       selectStation(nearestSt);
     }
   });
-
-  map.on("locationerror", () => alert("Không thể lấy vị trí của bạn."));
 }
 
-// --- CHỨC NĂNG CHỌN TRẠM & BIỂU ĐỒ ---
-async function selectStation(st) {
-  currentStationName = st.name;
-
-  // Giao diện
-  document.getElementById("chart-instruction")?.classList.add("hidden");
-  document.getElementById("charts-wrapper")?.classList.remove("hidden");
-  document.getElementById("selected-station-name").textContent = st.name;
-  document.getElementById("current-stats")?.classList.remove("hidden");
-
-  // Cập nhật chỉ số nhanh
-  ["aqi", "pm25", "pm10", "no2", "co", "so2", "o3"].forEach((k) => {
-    const el = document.getElementById(`val-${k}`);
-    if (el) {
-      el.textContent = st[k] ?? "--";
-      if (k === "aqi") el.style.color = getAQIColor(st[k]);
-    }
-  });
-
-  map.flyTo([st.lat, st.lon], 15);
-
-  // Load biểu đồ tùy theo tab đang mở
-  const isDaily =
-    document.querySelector(".tab-btn.active")?.dataset.tab === "daily";
-  isDaily ? loadDailyHistory(st.name) : loadHourlyHistory(st.name);
-}
-
-// --- BIỂU ĐỒ ECHARTS ---
-function renderLineChart(domId, title, color, labels, values) {
-  const dom = document.getElementById(domId);
-  if (!dom) return;
-  if (chartInstances[domId]) chartInstances[domId].dispose();
-
-  const chart = echarts.init(dom);
-  chartInstances[domId] = chart;
-
-  chart.setOption({
-    tooltip: { trigger: "axis" },
-    grid: { top: 30, bottom: 40, left: 40, right: 10 },
-    xAxis: {
-      type: "category",
-      data: labels,
-      axisLabel: { rotate: 45, fontSize: 10 },
-    },
-    yAxis: { type: "value" },
-    series: [
-      {
-        name: title,
-        type: "line",
-        smooth: true,
-        data: values,
-        itemStyle: { color },
-        areaStyle: { opacity: 0.1 },
-      },
-    ],
-  });
-}
-
-// Các hàm fetch history giữ nguyên logic cũ của bạn nhưng thêm try-catch tốt hơn
-async function loadHourlyHistory(name) {
-  try {
-    const res = await fetch(
-      `${HISTORY_API_URL}?name=${encodeURIComponent(name)}`,
-    );
-    const d = await res.json();
-    if (!d.times) return;
-    renderLineChart("chart-pm25", "PM2.5", "#3b82f6", d.times, d.pm25);
-    renderLineChart("chart-pm10", "PM10", "#10b981", d.times, d.pm10);
-    renderLineChart("chart-no2", "NO₂", "#f59e0b", d.times, d.no2);
-    renderLineChart("chart-co", "CO", "#ef4444", d.times, d.co);
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-// --- KHỞI TẠO HỆ THỐNG ---
+// --- KHỞI ĐỘNG & DỌN DẸP ---
 loadStations();
-
-// Cập nhật dữ liệu mỗi 5 phút
 setInterval(loadStations, 5 * 60 * 1000);
 
-// Xử lý sự kiện Sidebar
 document.getElementById("toggle-sidebar").addEventListener("click", () => {
   document.getElementById("sidebar").classList.toggle("hidden");
   setTimeout(() => map.invalidateSize(), 300);
 });
 
-// Gán sự kiện cho nút tìm kiếm trên bản đồ (Nếu bạn đã thêm nút vào HTML)
-const locateBtn = document.querySelector(".gis-btn");
-if (locateBtn) locateBtn.onclick = findNearest;
+window.addEventListener("beforeunload", () => {
+  Object.values(chartInstances).forEach((c) => c?.dispose());
+});
+
+setTimeout(() => {
+  const firstStation = document.querySelector(".station-card");
+  if (firstStation) firstStation.click();
+}, 2000);
