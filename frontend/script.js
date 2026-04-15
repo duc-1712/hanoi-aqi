@@ -456,8 +456,7 @@ const map = L.map("map").setView([21.0285, 105.8542], 12);
 map.createPane("heatmapPane");
 map.getPane("heatmapPane").style.zIndex = 350; // Đặt thấp hơn các lớp khác
 map.getPane("heatmapPane").style.pointerEvents = "none"; // Không cản trở click marker
-
-map.getPane("heatmapPane").style.filter = "blur(15px)";
+map.getPane("heatmapPane").style.filter = "blur(15px)"; // CHỈ LÀM MỜ KHAY NÀY
 const osmTile = L.tileLayer(
   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
   {
@@ -797,31 +796,58 @@ document.addEventListener("click", (e) => {
 // --- GIS - GADM & HEATMAP ---
 async function loadGADMData() {
   try {
-    // SỬA ĐƯỜNG DẪN: Nếu folder geodata nằm ngang hàng index.html
     const [res1, res2, res3] = await Promise.all([
       fetch("geodata/Hanoi_gadm_1.geojson"),
       fetch("geodata/Hanoi_gadm_2.geojson"),
       fetch("geodata/Hanoi_gadm_3.geojson"),
     ]);
 
-    if (!res1.ok)
-      throw new Error(
-        "Kiểm tra lại file Hanoi_gadm_1.geojson trong folder geodata",
-      );
+    if (!res1.ok) throw new Error("Kiểm tra lại file geojson!");
 
     const g1 = await res1.json();
     const g2 = await res2.json();
     const g3 = await res3.json();
-    gadm1_Layer.setStyle({
-      color: "#333", // Màu xám đậm hoặc đen cho sắc nét
-      weight: 2, // Độ dày đường viền
-      fillOpacity: 0, // Trong suốt để nhìn thấy heatmap bên dưới
-      interactive: false,
-    });
-    gadm1_Layer.clearLayers().addData(g1).addTo(map);
-    gadm2_Layer.clearLayers().addData(g2);
-    gadm3_Layer.clearLayers().addData(g3);
 
+    // --- CHỈNH STYLE NÉT CĂNG CHO 3 CẤP ---
+
+    // Cấp 1: Thành phố (Đường viền đậm nhất, bao quanh)
+    gadm1_Layer
+      .setStyle({
+        color: "#000000", // Màu đen cho rõ
+        weight: 3, // Độ dày 3px
+        opacity: 1, // Đậm đặc 100%
+        fillOpacity: 0, // Trong suốt để hiện heatmap bên dưới
+        interactive: false,
+      })
+      .clearLayers()
+      .addData(g1)
+      .addTo(map);
+
+    // Cấp 2: Quận/Huyện (Đường viền vừa)
+    gadm2_Layer
+      .setStyle({
+        color: "#4b5563", // Màu xám đậm
+        weight: 1.5, // Độ dày 1.5px
+        opacity: 0.8, // Hơi nhạt hơn cấp 1 tí
+        fillOpacity: 0,
+        interactive: false,
+      })
+      .clearLayers()
+      .addData(g2);
+
+    // Cấp 3: Phường/Xã (Đường viền mảnh nhất)
+    gadm3_Layer
+      .setStyle({
+        color: "#9ca3af", // Màu xám nhạt
+        weight: 0.8, // Độ dày 0.8px
+        opacity: 0.5,
+        fillOpacity: 0,
+        interactive: false,
+      })
+      .clearLayers()
+      .addData(g3);
+
+    // Vẽ heatmap lấy ranh giới g1 làm khuôn
     drawHeatmap(g1);
   } catch (err) {
     console.error("Lỗi load GADM:", err);
@@ -854,14 +880,12 @@ async function drawHeatmap(boundaryData) {
     const clipped = turf.pointsWithinPolygon(grid, boundaryData);
 
     L.geoJson(clipped, {
-      pane: "heatmapPane",
+      pane: "heatmapPane", // <--- BẮT BUỘC PHẢI CÓ DÒNG NÀY
       pointToLayer: (feature, latlng) => {
         return L.circleMarker(latlng, {
-          // 2. TĂNG BÁN KÍNH: Để các vòng tròn gối đầu lên nhau
           radius: 35,
           fillColor: getAQIColor(feature.properties.aqi),
           color: "none",
-          // 3. GIẢM OPACITY: Để khi chồng lên nhau màu sẽ đậm dần (tạo hiệu ứng nhiệt)
           fillOpacity: 0.2,
         });
       },
