@@ -46,28 +46,35 @@ import pkg from "pg";
 const { Pool } = pkg;
 import dotenv from "dotenv";
 
-dotenv.config(); // Nạp các biến môi trường từ file .env
+dotenv.config();
 
-// Ưu tiên lấy Connection String từ biến môi trường (Render/GitHub Actions)
-// Nếu không có, hãy dán trực tiếp link Supabase của bạn vào đây để test local
-const connectionString =
-  process.env.DATABASE_URL ||
-  "postgresql://postgres:[Xuan_duc1234]@db.ebygymgnekmbizraindp.supabase.co:5432/postgres";
+// Ưu tiên dùng biến môi trường để bảo mật
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.error(
+    "❌ CẢNH BÁO: Chưa cấu hình DATABASE_URL trong .env hoặc GitHub Secrets!",
+  );
+}
 
 const pool = new Pool({
   connectionString: connectionString,
   ssl: {
-    rejectUnauthorized: false, // Bắt buộc phải có để kết nối Supabase thành công
+    // Bắt buộc phải có rejectUnauthorized: false để làm việc với Supabase/Render
+    rejectUnauthorized: false,
   },
+  // Thêm giới hạn để tránh bị Supabase ngắt kết nối khi quá tải
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
-// Log kiểm tra trạng thái kết nối
 pool.on("connect", () => {
-  console.log("🚀 Đã kết nối thành công tới Database Cloud (Supabase)!");
+  console.log("🚀 Kết nối DB Cloud (Supabase) thành công!");
 });
 
 pool.on("error", (err) => {
-  console.error("❌ Lỗi kết nối Database:", err.message);
+  console.error("❌ Lỗi Pool Database:", err.message);
 });
 
 export { pool };
