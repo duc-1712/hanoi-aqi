@@ -430,9 +430,11 @@
 //   const firstStation = document.querySelector(".station-card");
 //   if (firstStation) firstStation.click();
 // }, 2000);
-const API_URL = "http://localhost:10000/api/stations";
-const HISTORY_API_URL = "http://localhost:10000/api/history";
 
+// const API_URL = "http://localhost:10000/api/stations";
+// const HISTORY_API_URL = "http://localhost:10000/api/history";
+const API_URL = "/api/stations";
+const HISTORY_API_URL = "/api/history";
 // --- 1. BIẾN TOÀN CỤC (GIỮ NGUYÊN 100%) ---
 let allStations = [];
 let chartInstances = {};
