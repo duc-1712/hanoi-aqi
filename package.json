@@ -1,0 +1,19 @@
+{
+  "name": "hanoi-aqi",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.0",
+    "pg": "^8.11.0",
+    "dotenv": "^16.0.0"
+  },
+  "keywords": [],
+  "author": "Nguyễn Xuân Đức",
+  "license": "ISC",
+  "description": "Hệ thống giám sát AQI Hà Nội chạy trên Vercel và Supabase"
+}
