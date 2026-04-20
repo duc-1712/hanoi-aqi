@@ -482,12 +482,12 @@ gadm1_Layer.addTo(map);
 // --- 3. LAYER CONTROL ---
 const baseMaps = { "Bản đồ nền": osmTile };
 const overlayMaps = {
-  "<span style='color: #ef4444'>●</span> Trạm quan trắc": markersLayer,
-  "<span style='color: #f59e0b'>✦</span> Bản đồ nhiệt (Heatmap)": heatmapLayer,
-  "🚩 Cấp 1: Thành phố": gadm1_Layer,
-  "🏢 Cấp 2: Quận/Huyện": gadm2_Layer,
-  "🏠 Cấp 3: Phường/Xã": gadm3_Layer,
-  "🌐 GeoServer WMS": geoserverLayer,
+  "<span style='color: #ef4444'></span> Trạm quan trắc": markersLayer,
+  "<span style='color: #f59e0b'></span> Bản đồ nhiệt (Heatmap)": heatmapLayer,
+  "Cấp 1: Thành phố": gadm1_Layer,
+  "Cấp 2: Quận/Huyện": gadm2_Layer,
+  "Cấp 3: Phường/Xã": gadm3_Layer,
+  "GeoServer WMS": geoserverLayer,
 };
 L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
