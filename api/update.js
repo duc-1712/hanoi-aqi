@@ -2,7 +2,6 @@
 import { updateAQIData } from "../backend/fetch_aqi.js";
 
 export default async function handler(req, res) {
-  // Đây là cái token để bảo mật, tránh người lạ vào phá
   const { token } = req.query;
 
   if (token !== "duc_1712") {
@@ -17,7 +16,7 @@ export default async function handler(req, res) {
       message: "Dữ liệu đã về Supabase!",
     });
   } catch (err) {
-    console.error("Lỗi rồi ông giáo ạ:", err.message);
+    console.error("Lỗi:", err.message);
     res.status(500).json({
       success: false,
       error: err.message,

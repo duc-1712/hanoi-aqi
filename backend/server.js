@@ -325,18 +325,13 @@ app.listen(PORT, async () => {
   };
 
   // 3. Thiết lập Cron Job (Chạy vào phút 00 và 30 mỗi giờ)
-  cron.schedule(
-    "0,30 * * * *",
-    () => performUpdate(false), // false = chạy tự động
-    {
-      scheduled: true,
-      timezone: "Asia/Ho_Chi_Minh",
-    },
-  );
+  cron.schedule("0,30 * * * *", () => performUpdate(false), {
+    scheduled: true,
+    timezone: "Asia/Ho_Chi_Minh",
+  });
 
-  // 4. QUAN TRỌNG: Chạy cập nhật NGAY LẬP TỨC khi server vừa bật
   console.log("Đang lấy dữ liệu lần đầu tiên ngay lập tức...");
-  await performUpdate(true); // true = chạy thủ công lúc boot
+  await performUpdate(true);
 
   console.log(
     "\nHỆ THỐNG ĐÃ SẴN SÀNG! Dữ liệu đã được cập nhật và lịch trình Cron đã được thiết lập.\n",

@@ -10,7 +10,7 @@ async function run() {
   } catch (err) {
     console.error("Có lỗi xảy ra:", err);
   } finally {
-    await pool.end(); // Bắt buộc đóng kết nối để GitHub tự tắt máy
+    await pool.end();
     process.exit(0);
   }
 }

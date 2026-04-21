@@ -1,7 +1,6 @@
 import { pool } from "../backend/db.js";
 
 export default async function handler(req, res) {
-  // Vercel tự động xử lý CORS nên ông không cần app.use(cors()) ở đây
   try {
     const { rows } = await pool.query(`
       SELECT 
