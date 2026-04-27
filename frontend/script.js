@@ -468,7 +468,7 @@ const geoserverLayer = L.tileLayer.wms(
   "http://localhost:8080/geoserver/hanoi_aqi/wms",
   {
     layers: "hanoi_aqi:vw_latest_station_aqi",
-    styles: "style_hanoi_aqi",
+    styles: "style_layer",
     format: "image/png",
     transparent: true,
     version: "1.1.0",
