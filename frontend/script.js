@@ -473,10 +473,11 @@ const geoserverLayer = L.tileLayer.wms(
     transparent: true,
     version: "1.1.0",
     zIndex: 1000,
+    t: new Date().getTime(), // Thêm tham số để tránh cache
   },
 );
 
-markersLayer.addTo(map);
+//markersLayer.addTo(map);//
 gadm1_Layer.addTo(map);
 
 // --- 3. LAYER CONTROL ---
