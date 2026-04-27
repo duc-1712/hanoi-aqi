@@ -195,6 +195,12 @@ const STATIONS = [
 
 const IQAIR_STATIONS = [
   {
+    name: "Trạm Hai Bà Trưng (IQAir)",
+    area: "Hai Bà Trưng",
+    lat: 21.017, // Tọa độ khu vực Hai Bà Trưng
+    lon: 105.848,
+  },
+  {
     name: "Ba Đình US Embassy (IQAir)",
     area: "Ba Đình",
     lat: 21.03333,
@@ -203,7 +209,7 @@ const IQAIR_STATIONS = [
 ];
 
 // ====== HELPER FETCH ======
-async function fetchWithTimeout(url, timeout = 3000) {
+async function fetchWithTimeout(url, timeout = 5000) {
   return fetch(url, {
     signal: AbortSignal.timeout(timeout),
   });
@@ -231,17 +237,18 @@ async function processStation(station) {
     ) {
       source = "IQAir";
 
+      // SỬA LẠI: Dùng đúng tên "Hai BaTrung" đã test thành công
       const cityMap = {
-        "Ba Đình": "Ba Dinh",
+        "Ba Đình": "Hanoi",
+        "Hai Bà Trưng": "Hai BaTrung",
         "Trung tâm": "Hanoi",
       };
 
       const city = cityMap[station.area] || "Hanoi";
 
+      // Sử dụng đúng state "Ha Noi" có dấu cách
       const res = await fetchWithTimeout(
-        `https://api.airvisual.com/v2/city?city=${encodeURIComponent(
-          city,
-        )}&state=Hanoi&country=Vietnam&key=${IQAIR_KEY}`,
+        `https://api.airvisual.com/v2/city?city=${encodeURIComponent(city)}&state=${encodeURIComponent("Ha Noi")}&country=Vietnam&key=${IQAIR_KEY}`,
       );
 
       const json = await res.json();
@@ -249,8 +256,9 @@ async function processStation(station) {
       if (json.status === "success") {
         const d = json.data.current.pollution;
         aqi = Number(d.aqius);
-        pm25 = d.pm25 ?? null;
-        pm10 = d.pm10 ?? null;
+        // SỬA LỖI: Bóc tách nồng độ từ p2 (PM2.5) và p1 (PM10)
+        pm25 = d.p2?.conc ?? null;
+        pm10 = d.p1?.conc ?? null;
       }
     }
 
