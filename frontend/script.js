@@ -467,13 +467,12 @@ const osmTile = L.tileLayer(
 const geoserverLayer = L.tileLayer.wms(
   "http://localhost:8080/geoserver/hanoi_aqi/wms",
   {
-    layers: "hanoi_aqi:vw_latest_station_aqi",
-    styles: "style_layer",
+    layers: "hanoi_aqi:hanoi_aqi_force", // Sửa lại đúng tên layer mới
+    styles: "style_layer_hanoi_aqi",
     format: "image/png",
     transparent: true,
     version: "1.1.0",
-    zIndex: 1000,
-    t: new Date().getTime(), // Thêm tham số để tránh cache
+    t: new Date().getTime(), // Thêm cái này để phá cache trình duyệt
   },
 );
 
