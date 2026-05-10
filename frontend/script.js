@@ -1,11 +1,14 @@
 // --- 1. CONFIG API ---
 const API_URL = "/api/stations";
 const HISTORY_API_URL = "/api/history";
+const NOMINATIM_API = "https://nominatim.openstreetmap.org/search";
 
 // --- 2. BIẾN TOÀN CỤC (GIỮ NGUYÊN 100%) ---
 let allStations = [];
 let chartInstances = {};
 let currentStationName = "";
+let searchMarker = null; // Marker cho địa điểm tìm kiếm
+let searchTimeout = null; // Debounce timer
 
 // Các lớp chứa dữ liệu
 let markersLayer = L.layerGroup(); // Sẽ dùng lớp này để vẽ 6 trạm chuẩn API
@@ -186,7 +189,123 @@ function renderDailyAQIChart(labels = [], values = []) {
   window.addEventListener("resize", () => chart.resize());
 }
 
-// --- 7. LOAD TRẠM (CHỈNH SỬA: LÀM HIỆN MARKER RÕ NÉT) ---
+// --- 7. LOCATION SEARCH LOGIC ---
+async function searchLocations(query) {
+  if (!query || query.trim().length < 2) {
+    document.getElementById("search-results").classList.add("hidden");
+    return;
+  }
+
+  const resultsDiv = document.getElementById("search-results");
+  resultsDiv.classList.remove("hidden");
+  resultsDiv.innerHTML = '<div class="search-loading">Đang tìm kiếm...</div>';
+
+  try {
+    // Gọi Nominatim API với bounds của Hà Nội
+    const response = await fetch(
+      `${NOMINATIM_API}?format=json&q=${encodeURIComponent(query)}&viewbox=105.5,20.8,106.2,21.4&bounded=1&limit=8`
+    );
+    const results = await response.json();
+
+    if (!results || results.length === 0) {
+      resultsDiv.innerHTML =
+        '<div class="search-no-results">Không tìm thấy kết quả</div>';
+      return;
+    }
+
+    // Xây dựng HTML cho các kết quả
+    let html = "";
+    results.forEach((result) => {
+      html += `
+        <div class="search-result-item" onclick="selectSearchLocation(${result.lat}, ${result.lon}, '${result.display_name}')">
+          <div class="result-name">${result.display_name}</div>
+          <div class="result-coords">${result.lat.toFixed(4)}, ${result.lon.toFixed(4)}</div>
+        </div>
+      `;
+    });
+    resultsDiv.innerHTML = html;
+  } catch (error) {
+    console.error("Lỗi tìm kiếm:", error);
+    resultsDiv.innerHTML =
+      '<div class="search-no-results">Lỗi tìm kiếm, vui lòng thử lại</div>';
+  }
+}
+
+function selectSearchLocation(lat, lon, displayName) {
+  // Xóa marker cũ nếu có
+  if (searchMarker) {
+    map.removeLayer(searchMarker);
+  }
+
+  // Thêm marker mới (màu tím)
+  searchMarker = L.circleMarker([lat, lon], {
+    radius: 12,
+    weight: 2,
+    opacity: 1,
+    fillOpacity: 0.9,
+    color: "#ffffff",
+    fillColor: "#a855f7", // Màu tím
+  }).addTo(map);
+
+  searchMarker.bindPopup(
+    `<div style="text-align:center;font-family:system-ui; min-width: 200px;">
+      <b style="font-size: 16px;">📍 ${displayName}</b><br>
+      <div style="margin: 5px 0; font-size: 12px; color: #666;">${lat.toFixed(4)}, ${lon.toFixed(4)}</div>
+    </div>`
+  );
+  searchMarker.openPopup();
+
+  // Zoom tới vị trí
+  map.flyTo([lat, lon], 16, { duration: 1.5 });
+
+  // Tìm trạm gần nhất
+  findNearestToLocation(lat, lon);
+
+  // Ẩn kết quả tìm kiếm
+  document.getElementById("search-results").classList.add("hidden");
+  document.getElementById("location-search").value = displayName;
+}
+
+// Hàm tính khoảng cách giữa 2 điểm (Haversine formula)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Bán kính Trái Đất (km)
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Trả về km
+}
+
+function findNearestToLocation(lat, lon) {
+  if (!allStations || allStations.length === 0) return;
+
+  let nearest = null;
+  let minDistance = Infinity;
+
+  allStations.forEach((station) => {
+    const distance = calculateDistance(
+      lat,
+      lon,
+      parseFloat(station.lat),
+      parseFloat(station.lon)
+    );
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearest = station;
+    }
+  });
+
+  if (nearest) {
+    selectStation(nearest);
+  }
+}
+
+// --- 8. LOAD TRẠM (CHỈNH SỬA: LÀM HIỆN MARKER RÕ NÉT) ---
 async function loadStations() {
   const list = document.getElementById("station-list");
   try {
@@ -236,7 +355,7 @@ async function loadStations() {
   }
 }
 
-// --- 8. CHỌN TRẠM & LỜI KHUYÊN (GIỮ NGUYÊN) ---
+// --- 9. CHỌN TRẠM & LỜI KHUYÊN (GIỮ NGUYÊN) ---
 async function selectStation(st) {
   currentStationName = st.name;
   document.getElementById("chart-instruction").classList.add("hidden");
@@ -268,11 +387,11 @@ async function selectStation(st) {
   isDaily ? loadDailyHistory(st.name) : loadHourlyHistory(st.name);
 }
 
-// --- 9. FETCH LỊCH SỬ (GIỮ NGUYÊN) ---
+// --- 10. FETCH LỊCH SỬ (GIỮ NGUYÊN) ---
 async function loadHourlyHistory(name) {
   try {
     const res = await fetch(
-      `${HISTORY_API_URL}?name=${encodeURIComponent(name)}`,
+      `${HISTORY_API_URL}?name=${encodeURIComponent(name)}`
     );
     const d = await res.json();
     if (!d.times?.length) return;
@@ -290,7 +409,7 @@ async function loadHourlyHistory(name) {
 async function loadDailyHistory(name) {
   try {
     const res = await fetch(
-      `${HISTORY_API_URL}?name=${encodeURIComponent(name)}&mode=daily`,
+      `${HISTORY_API_URL}?name=${encodeURIComponent(name)}&mode=daily`
     );
     if (!res.ok) {
       renderDailyAQIChart([], []);
@@ -303,7 +422,7 @@ async function loadDailyHistory(name) {
   }
 }
 
-// --- 10. GIS - GADM & HEATMAP (GIỮ NGUYÊN) ---
+// --- 11. GIS - GADM & HEATMAP (GIỮ NGUYÊN) ---
 async function loadGADMData() {
   try {
     const [res1, res2, res3] = await Promise.all([
@@ -358,8 +477,8 @@ async function drawHeatmap(boundaryData) {
       allStations.map((st) =>
         turf.point([parseFloat(st.lon), parseFloat(st.lat)], {
           aqi: parseFloat(st.aqi),
-        }),
-      ),
+        })
+      )
     );
     const grid = turf.interpolate(points, 2, {
       gridType: "points",
@@ -383,7 +502,43 @@ async function drawHeatmap(boundaryData) {
   }
 }
 
-// --- 11. KHỞI ĐỘNG & SỰ KIỆN ---
+// --- 12. SEARCH INPUT EVENTS ---
+const searchInput = document.getElementById("location-search");
+const clearBtn = document.getElementById("clear-search");
+const resultsDiv = document.getElementById("search-results");
+
+searchInput.addEventListener("input", (e) => {
+  const query = e.target.value.trim();
+
+  // Hiện/ẩn nút clear
+  if (query.length > 0) {
+    clearBtn.style.display = "flex";
+  } else {
+    clearBtn.style.display = "none";
+    resultsDiv.classList.add("hidden");
+  }
+
+  // Debounce tìm kiếm
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    searchLocations(query);
+  }, 300);
+});
+
+clearBtn.addEventListener("click", () => {
+  searchInput.value = "";
+  clearBtn.style.display = "none";
+  resultsDiv.classList.add("hidden");
+});
+
+// Ẩn results khi click bên ngoài
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".search-box")) {
+    resultsDiv.classList.add("hidden");
+  }
+});
+
+// --- 13. KHỞI ĐỘNG & SỰ KIỆN ---
 loadStations();
 setInterval(loadStations, 5 * 60 * 1000);
 
