@@ -30,6 +30,24 @@
       <div class="sidebar-header">
         <h2>Các trạm quan trắc</h2>
       </div>
+
+      <!-- SEARCH BOX -->
+      <div class="search-box">
+        <div class="search-input-wrapper">
+          <i class="fa-solid fa-magnifying-glass search-icon"></i>
+          <input 
+            type="text" 
+            id="location-search" 
+            placeholder="Tìm địa điểm..."
+            class="search-input"
+          />
+          <button id="clear-search" class="clear-btn" style="display: none;">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div id="search-results" class="search-results hidden"></div>
+      </div>
+
       <div class="list-wrapper">
         <ul id="station-list">
           <li class="loading">Đang tải dữ liệu...</li>
