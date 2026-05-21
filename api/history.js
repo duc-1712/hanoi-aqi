@@ -1,52 +1,42 @@
 import { pool } from "../backend/db.js";
 
-function getRangeCondition(range, from, to) {
+function buildRangeSQL(range, from, to) {
   if (from && to) {
     return {
-      condition: `AND recorded_at >= $2::date 
-                  AND recorded_at < ($3::date + INTERVAL '1 day')`,
+      sql: `AND recorded_at >= $2::date
+            AND recorded_at < ($3::date + INTERVAL '1 day')`,
       params: [from, to],
     };
   }
 
   if (range === "24h") {
     return {
-      condition: `AND recorded_at >= NOW() - INTERVAL '24 hours'`,
+      sql: `AND recorded_at >= NOW() - INTERVAL '24 hours'`,
       params: [],
     };
   }
 
   if (range === "7d") {
-    return {
-      condition: `AND recorded_at >= NOW() - INTERVAL '7 days'`,
-      params: [],
-    };
+    return { sql: `AND recorded_at >= NOW() - INTERVAL '7 days'`, params: [] };
   }
 
   if (range === "30d") {
-    return {
-      condition: `AND recorded_at >= NOW() - INTERVAL '30 days'`,
-      params: [],
-    };
+    return { sql: `AND recorded_at >= NOW() - INTERVAL '30 days'`, params: [] };
   }
 
   if (range === "all") {
-    return {
-      condition: ``,
-      params: [],
-    };
+    return { sql: ``, params: [] };
   }
 
-  return {
-    condition: `AND recorded_at >= NOW() - INTERVAL '3 days'`,
-    params: [],
-  };
+  return { sql: `AND recorded_at >= NOW() - INTERVAL '30 days'`, params: [] };
 }
 
 export default async function handler(req, res) {
-  const { name, mode, range = "3d", from, to } = req.query;
+  const { name, mode, range = "30d", from, to } = req.query;
 
-  if (!name) return res.status(400).json({ error: "Thiếu tên trạm" });
+  if (!name) {
+    return res.status(400).json({ error: "Thiếu tên trạm" });
+  }
 
   try {
     const stationResult = await pool.query(
@@ -59,22 +49,21 @@ export default async function handler(req, res) {
     }
 
     const stationId = stationResult.rows[0].id;
-    const rangeData = getRangeCondition(range, from, to);
+    const rangeData = buildRangeSQL(range, from, to);
+    const params = [stationId, ...rangeData.params];
 
     if (mode === "daily") {
-      const params = [stationId, ...rangeData.params];
-
       const { rows } = await pool.query(
         `
         SELECT 
           to_char(recorded_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'DD/MM/YYYY') AS date_str,
           DATE(recorded_at AT TIME ZONE 'Asia/Ho_Chi_Minh') AS sort_date,
-          COALESCE(ROUND(AVG(aqi)::numeric), 0)::INTEGER AS aqi,
+          ROUND(AVG(aqi)::numeric, 0)::INTEGER AS aqi,
           ROUND(AVG(pm25)::numeric, 1) AS pm25,
           ROUND(AVG(pm10)::numeric, 1) AS pm10
         FROM station_history
         WHERE station_id = $1
-          ${rangeData.condition}
+          ${rangeData.sql}
           AND aqi IS NOT NULL
         GROUP BY sort_date, date_str
         ORDER BY sort_date ASC
@@ -90,17 +79,21 @@ export default async function handler(req, res) {
       });
     }
 
-    const params = [stationId, ...rangeData.params];
-
     const { rows } = await pool.query(
       `
       SELECT 
         to_char(recorded_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI DD/MM') AS time_str,
         recorded_at,
-        aqi, pm25, pm10, o3, no2, so2, co
+        aqi,
+        pm25,
+        pm10,
+        o3,
+        no2,
+        so2,
+        co
       FROM station_history
       WHERE station_id = $1
-        ${rangeData.condition}
+        ${rangeData.sql}
         AND aqi IS NOT NULL
       ORDER BY recorded_at ASC
       `,

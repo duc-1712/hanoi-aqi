@@ -962,32 +962,48 @@ async function selectStation(st, options = {}) {
   isDaily ? loadDailyHistory(st.name) : loadHourlyHistory(st.name);
 }
 
-let currentHistoryRange = "24h";
+let currentHistoryRange = "30d";
+
+function buildHistoryUrl(name, mode = "") {
+  const from = document.getElementById("history-from")?.value;
+  const to = document.getElementById("history-to")?.value;
+
+  let url = `${HISTORY_API_URL}?name=${encodeURIComponent(name)}`;
+
+  if (mode) url += `&mode=${mode}`;
+
+  if (from && to) {
+    url += `&from=${from}&to=${to}`;
+  } else {
+    url += `&range=${currentHistoryRange}`;
+  }
+
+  return url;
+}
 
 async function loadHourlyHistory(name) {
   try {
-    const from = document.getElementById("history-from")?.value;
-    const to = document.getElementById("history-to")?.value;
-
-    let url = `${HISTORY_API_URL}?name=${encodeURIComponent(name)}`;
-
-    if (from && to) {
-      url += `&from=${from}&to=${to}`;
-    } else {
-      url += `&range=${currentHistoryRange}`;
-    }
-
-    const res = await fetch(url);
+    const res = await fetch(buildHistoryUrl(name));
     const d = await res.json();
 
-    if (!d.times?.length) return;
-
-    renderLineChart("chart-pm25", "PM2.5", "#3b82f6", d.times, d.pm25);
-    renderLineChart("chart-pm10", "PM10", "#10b981", d.times, d.pm10);
-    renderLineChart("chart-no2", "NO₂", "#f59e0b", d.times, d.no2);
-    renderLineChart("chart-co", "CO", "#ef4444", d.times, d.co);
-    renderLineChart("chart-o3", "O₃", "#8b5cf6", d.times, d.o3);
-    renderLineChart("chart-so2", "SO₂", "#6366f1", d.times, d.so2);
+    renderLineChart(
+      "chart-pm25",
+      "PM2.5",
+      "#3b82f6",
+      d.times || [],
+      d.pm25 || [],
+    );
+    renderLineChart(
+      "chart-pm10",
+      "PM10",
+      "#10b981",
+      d.times || [],
+      d.pm10 || [],
+    );
+    renderLineChart("chart-no2", "NO₂", "#f59e0b", d.times || [], d.no2 || []);
+    renderLineChart("chart-co", "CO", "#ef4444", d.times || [], d.co || []);
+    renderLineChart("chart-o3", "O₃", "#8b5cf6", d.times || [], d.o3 || []);
+    renderLineChart("chart-so2", "SO₂", "#6366f1", d.times || [], d.so2 || []);
   } catch (err) {
     console.error("Lỗi hourly:", err);
   }
@@ -995,27 +1011,12 @@ async function loadHourlyHistory(name) {
 
 async function loadDailyHistory(name) {
   try {
-    const from = document.getElementById("history-from")?.value;
-    const to = document.getElementById("history-to")?.value;
-
-    let url = `${HISTORY_API_URL}?name=${encodeURIComponent(name)}&mode=daily`;
-
-    if (from && to) {
-      url += `&from=${from}&to=${to}`;
-    } else {
-      url += `&range=${currentHistoryRange}`;
-    }
-
-    const res = await fetch(url);
-
-    if (!res.ok) {
-      renderDailyAQIChart([], []);
-      return;
-    }
-
+    const res = await fetch(buildHistoryUrl(name, "daily"));
     const d = await res.json();
+
     renderDailyAQIChart(d.dates || [], d.aqi || []);
   } catch (err) {
+    console.error("Lỗi daily:", err);
     renderDailyAQIChart([], []);
   }
 }
@@ -1199,6 +1200,22 @@ document.addEventListener("click", (e) => {
   document.getElementById(`tab-${tab}`)?.classList.add("active");
 
   if (currentStationName) {
+    if (tab === "daily") {
+      currentHistoryRange = "30d";
+    } else {
+      currentHistoryRange = "7d";
+    }
+
+    document.querySelectorAll(".range-btn").forEach((btn) => {
+      btn.classList.remove("active");
+      if (btn.dataset.range === currentHistoryRange) {
+        btn.classList.add("active");
+      }
+    });
+
+    document.getElementById("history-from").value = "";
+    document.getElementById("history-to").value = "";
+
     tab === "daily"
       ? loadDailyHistory(currentStationName)
       : loadHourlyHistory(currentStationName);
@@ -1210,3 +1227,38 @@ setTimeout(() => {
     selectStation(allStations[0], { fly: false, openPopup: false });
   }
 }, 1200);
+
+document.addEventListener("click", (e) => {
+  if (!e.target.matches(".range-btn")) return;
+
+  currentHistoryRange = e.target.dataset.range;
+
+  document.querySelectorAll(".range-btn").forEach((btn) => {
+    btn.classList.remove("active");
+  });
+
+  e.target.classList.add("active");
+
+  document.getElementById("history-from").value = "";
+  document.getElementById("history-to").value = "";
+
+  if (!currentStationName) return;
+
+  const isDaily =
+    document.querySelector(".tab-btn.active")?.dataset.tab === "daily";
+
+  isDaily
+    ? loadDailyHistory(currentStationName)
+    : loadHourlyHistory(currentStationName);
+});
+
+document.getElementById("btn-load-history")?.addEventListener("click", () => {
+  if (!currentStationName) return;
+
+  const isDaily =
+    document.querySelector(".tab-btn.active")?.dataset.tab === "daily";
+
+  isDaily
+    ? loadDailyHistory(currentStationName)
+    : loadHourlyHistory(currentStationName);
+});
