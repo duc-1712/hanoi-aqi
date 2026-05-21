@@ -87,7 +87,15 @@
             <button class="tab-btn active" data-tab="hourly">Hằng giờ</button>
             <button class="tab-btn" data-tab="daily">Hằng ngày</button>
           </div>
-
+          <div class="history-filter">
+            <button class="range-btn active" data-range="24h">24 giờ</button>
+            <button class="range-btn" data-range="7d">7 ngày</button>
+            <button class="range-btn" data-range="30d">30 ngày</button>
+            <button class="range-btn" data-range="all">Tất cả</button>
+            <input type="date" id="history-from">
+            <input type="date" id="history-to">
+            <button id="btn-load-history">Xem</button>
+          </div>
           <div id="tab-hourly" class="tab-content active">
             <div class="chart-row">
               <div class="chart-card">

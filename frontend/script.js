@@ -962,11 +962,22 @@ async function selectStation(st, options = {}) {
   isDaily ? loadDailyHistory(st.name) : loadHourlyHistory(st.name);
 }
 
+let currentHistoryRange = "24h";
+
 async function loadHourlyHistory(name) {
   try {
-    const res = await fetch(
-      `${HISTORY_API_URL}?name=${encodeURIComponent(name)}`,
-    );
+    const from = document.getElementById("history-from")?.value;
+    const to = document.getElementById("history-to")?.value;
+
+    let url = `${HISTORY_API_URL}?name=${encodeURIComponent(name)}`;
+
+    if (from && to) {
+      url += `&from=${from}&to=${to}`;
+    } else {
+      url += `&range=${currentHistoryRange}`;
+    }
+
+    const res = await fetch(url);
     const d = await res.json();
 
     if (!d.times?.length) return;
@@ -984,9 +995,18 @@ async function loadHourlyHistory(name) {
 
 async function loadDailyHistory(name) {
   try {
-    const res = await fetch(
-      `${HISTORY_API_URL}?name=${encodeURIComponent(name)}&mode=daily`,
-    );
+    const from = document.getElementById("history-from")?.value;
+    const to = document.getElementById("history-to")?.value;
+
+    let url = `${HISTORY_API_URL}?name=${encodeURIComponent(name)}&mode=daily`;
+
+    if (from && to) {
+      url += `&from=${from}&to=${to}`;
+    } else {
+      url += `&range=${currentHistoryRange}`;
+    }
+
+    const res = await fetch(url);
 
     if (!res.ok) {
       renderDailyAQIChart([], []);
@@ -996,7 +1016,6 @@ async function loadDailyHistory(name) {
     const d = await res.json();
     renderDailyAQIChart(d.dates || [], d.aqi || []);
   } catch (err) {
-    console.error("Lỗi daily:", err);
     renderDailyAQIChart([], []);
   }
 }
