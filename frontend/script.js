@@ -979,8 +979,6 @@ function createAQIMarker(st) {
     zIndexOffset: 1000,
   }).addTo(markersLayer);
 
-  const marker = createAQIMarker(st);
-
 const trendData = await getAQITrend(st.name);
 
 marker.bindPopup(`
@@ -1307,75 +1305,7 @@ async function loadDailyHistory(name) {
     renderDailyAQIChart([], []);
   }
 }
-
 async function loadGADMData() {
-  try {
-    const [res1, res2, res3] = await Promise.all([
-      fetch("geodata/Hanoi_gadm_1.geojson"),
-      fetch("geodata/Hanoi_gadm_2.geojson"),
-      fetch("geodata/Hanoi_gadm_3.geojson"),
-    ]);
-
-    const g1 = await res1.json();
-    const g2 = await res2.json();
-    const g3 = await res3.json();
-
-    gadm1_Layer.clearLayers();
-    gadm2_Layer.clearLayers();
-    gadm3_Layer.clearLayers();
-
-    gadm1_Layer = L.geoJson(g1, {
-      pane: "boundaryPane",
-      style: (feature) => styleGADMByAQI(feature, 1),
-      onEachFeature: onEachGADMFeature,
-    });
-
-    gadm2_Layer = L.geoJson(g2, {
-      pane: "boundaryPane",
-      style: (feature) => styleGADMByAQI(feature, 2),
-      onEachFeature: onEachGADMFeature,
-    });
-
-    gadm3_Layer = L.geoJson(g3, {
-      pane: "boundaryPane",
-      style: (feature) => styleGADMByAQI(feature, 3),
-      onEachFeature: onEachGADMFeature,
-    });
-
-    // Mặc định chỉ bật cấp 2 cho dễ nhìn
-    if (map.hasLayer(gadm1_Layer)) map.removeLayer(gadm1_Layer);
-    if (map.hasLayer(gadm3_Layer)) map.removeLayer(gadm3_Layer);
-
-    gadm2_Layer.addTo(map);
-
-    // Cập nhật lại layer control để nhận layer mới
-    if (layerControl) {
-      map.removeControl(layerControl);
-    }
-
-    const baseMaps = {
-      "Bản đồ nền": osmTile,
-    };
-
-    const overlayMaps = {
-      "Trạm quan trắc AQI": markersLayer,
-      "Bản đồ nhiệt AQI": heatmapLayer,
-      "Cấp 1: Thành phố": gadm1_Layer,
-      "Cấp 2: Quận/Huyện - AQI ước lượng": gadm2_Layer,
-      "Cấp 3: Phường/Xã - AQI ước lượng": gadm3_Layer,
-      "GeoServer AQI": geoserverLayer,
-    };
-
-    layerControl = L.control.layers(baseMaps, overlayMaps, {
-      collapsed: false,
-      position: "topright",
-    }).addTo(map);
-
-    drawHeatmap();
-  } catch (err) {
-    console.error("Lỗi load GADM:", err);
-  }
-}async function loadGADMData() {
   try {
     const [res1, res2, res3] = await Promise.all([
       fetch("geodata/Hanoi_gadm_1.geojson"),
@@ -1640,3 +1570,49 @@ document.getElementById("btn-load-history")?.addEventListener("click", () => {
     ? loadDailyHistory(currentStationName)
     : loadHourlyHistory(currentStationName);
 });
+window.findNearest = function () {
+  if (!navigator.geolocation) {
+    alert("Trình duyệt không hỗ trợ định vị.");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+
+      let nearest = null;
+      let minDistance = Infinity;
+
+      allStations.forEach((st) => {
+        const distance = calculateDistance(
+          lat,
+          lon,
+          parseFloat(st.lat),
+          parseFloat(st.lon)
+        );
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearest = st;
+        }
+      });
+
+      if (nearest) {
+        selectStation(nearest);
+
+        const marker = stationMarkers?.get(nearest.name);
+        if (marker) marker.openPopup();
+
+        alert(
+          `Trạm gần nhất: ${nearest.name}\nKhoảng cách: ${minDistance.toFixed(
+            2
+          )} km\nAQI: ${nearest.aqi}`
+        );
+      }
+    },
+    () => {
+      alert("Không lấy được vị trí. Hãy cấp quyền định vị cho trình duyệt.");
+    }
+  );
+};
