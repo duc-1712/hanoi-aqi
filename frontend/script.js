@@ -340,9 +340,7 @@ function onEachGADMFeature(feature, layer) {
 
       <div style="font-size:13px;color:#334155;line-height:1.5;">
         <b>Trạm gần nhất:</b> ${nearest}<br>
-        <b>Khoảng cách:</b> ${
-          distance ? distance.toFixed(2) + " km" : "--"
-        }<br>
+        <b>Khoảng cách:</b> ${distance ? distance.toFixed(2) + " km" : "--"}<br>
         <b>Ghi chú:</b> Giá trị AQI là ước lượng không gian, không phải số đo trực tiếp tại toàn bộ khu vực.
       </div>
     </div>
@@ -358,10 +356,9 @@ function onEachGADMFeature(feature, layer) {
       layer.bringToFront();
     },
     mouseout: function () {
-      const parentLayer =
-        gadm3_Layer.hasLayer(layer)
-          ? gadm3_Layer
-          : gadm2_Layer.hasLayer(layer)
+      const parentLayer = gadm3_Layer.hasLayer(layer)
+        ? gadm3_Layer
+        : gadm2_Layer.hasLayer(layer)
           ? gadm2_Layer
           : gadm1_Layer;
 
@@ -979,14 +976,36 @@ function createAQIMarker(st) {
     zIndexOffset: 1000,
   }).addTo(markersLayer);
 
-const trendData = await getAQITrend(st.name);
+  let trendData = {
+    trend: "Đang tính",
+    percent: "--",
+    avg24h: "--",
+    icon: "→",
+  };
 
-marker.bindPopup(`
+  function buildMarkerPopup(st, color, info, trendData) {
+    const trendColor =
+      trendData.trend === "Tăng"
+        ? "#dc2626"
+        : trendData.trend === "Giảm"
+          ? "#16a34a"
+          : "#2563eb";
+
+    const trendPercent =
+      trendData.percent === undefined || trendData.percent === null
+        ? "--"
+        : trendData.percent;
+
+    const avg24h =
+      trendData.avg24h === undefined || trendData.avg24h === null
+        ? "--"
+        : trendData.avg24h;
+
+    return `
 <div style="
   font-family:Inter;
   min-width:250px;
 ">
-  
   <div style="
     font-size:18px;
     font-weight:900;
@@ -1011,7 +1030,7 @@ marker.bindPopup(`
 
   <div style="
     background:${color};
-    color:white;
+    color:${st.aqi <= 100 ? "#111" : "#fff"};
     padding:6px 12px;
     border-radius:999px;
     text-align:center;
@@ -1035,25 +1054,19 @@ marker.bindPopup(`
     <div style="
       font-size:20px;
       font-weight:900;
-      color:${
-        trendData.trend === "Tăng"
-          ? "#dc2626"
-          : trendData.trend === "Giảm"
-          ? "#16a34a"
-          : "#2563eb"
-      };
+      color:${trendColor};
     ">
-      ${trendData.icon} ${trendData.trend}
+      ${trendData.icon || "→"} ${trendData.trend || "Không xác định"}
     </div>
 
     <div style="margin-top:5px;">
       Biến động:
-      <b>${trendData.percent}%</b>
+      <b>${trendPercent}%</b>
     </div>
 
     <div style="margin-top:5px;">
       AQI TB 24h:
-      <b>${trendData.avg24h ?? "--"}</b>
+      <b>${avg24h}</b>
     </div>
   </div>
 
@@ -1073,7 +1086,7 @@ marker.bindPopup(`
         PM2.5
       </div>
       <div style="font-weight:800">
-        ${st.pm25 ?? "--"}
+        ${st.pm25 ?? "--"} µg/m³
       </div>
     </div>
 
@@ -1087,7 +1100,7 @@ marker.bindPopup(`
         PM10
       </div>
       <div style="font-weight:800">
-        ${st.pm10 ?? "--"}
+        ${st.pm10 ?? "--"} µg/m³
       </div>
     </div>
   </div>
@@ -1101,10 +1114,29 @@ marker.bindPopup(`
     "${info.advice}"
   </div>
 </div>
-`, {
-  maxWidth: 320,
-  closeButton: true,
-});
+`;
+  }
+
+  marker.bindPopup(buildMarkerPopup(st, color, info, trendData), {
+    maxWidth: 320,
+    closeButton: true,
+  });
+
+  getAQITrend(st.name)
+    .then((realTrend) => {
+      trendData = realTrend;
+      marker.setPopupContent(buildMarkerPopup(st, color, info, trendData));
+    })
+    .catch((err) => {
+      console.error("Lỗi trend:", err);
+      trendData = {
+        trend: "Không xác định",
+        percent: "--",
+        avg24h: "--",
+        icon: "→",
+      };
+      marker.setPopupContent(buildMarkerPopup(st, color, info, trendData));
+    });
 
   marker.on("click", () => selectStation(st, { fly: false, openPopup: false }));
   marker.on("mouseover", () => marker.setZIndexOffset(2000));
@@ -1363,10 +1395,12 @@ async function loadGADMData() {
       "GeoServer AQI": geoserverLayer,
     };
 
-    layerControl = L.control.layers(baseMaps, overlayMaps, {
-      collapsed: false,
-      position: "topright",
-    }).addTo(map);
+    layerControl = L.control
+      .layers(baseMaps, overlayMaps, {
+        collapsed: false,
+        position: "topright",
+      })
+      .addTo(map);
 
     drawHeatmap();
   } catch (err) {
@@ -1589,7 +1623,7 @@ window.findNearest = function () {
           lat,
           lon,
           parseFloat(st.lat),
-          parseFloat(st.lon)
+          parseFloat(st.lon),
         );
 
         if (distance < minDistance) {
@@ -1606,13 +1640,13 @@ window.findNearest = function () {
 
         alert(
           `Trạm gần nhất: ${nearest.name}\nKhoảng cách: ${minDistance.toFixed(
-            2
-          )} km\nAQI: ${nearest.aqi}`
+            2,
+          )} km\nAQI: ${nearest.aqi}`,
         );
       }
     },
     () => {
       alert("Không lấy được vị trí. Hãy cấp quyền định vị cho trình duyệt.");
-    }
+    },
   );
 };
