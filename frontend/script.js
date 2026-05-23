@@ -956,12 +956,15 @@ function buildStationPopup(st) {
 function createAQIMarker(st) {
   const color = getAQIColor(st.aqi);
   const textColor = getAQITextColor(st.aqi);
+  const info = getAQIInfo(st.aqi);
 
   const icon = L.divIcon({
     className: "aqi-marker-wrap",
     html: `
       <div class="aqi-marker" style="background:${color};color:${color};">
-        <span style="color:${textColor};">${formatValue(st.aqi)}</span>
+        <span style="color:${textColor};">
+          ${formatValue(st.aqi)}
+        </span>
       </div>
     `,
     iconSize: [48, 48],
@@ -976,171 +979,168 @@ function createAQIMarker(st) {
     zIndexOffset: 1000,
   }).addTo(markersLayer);
 
-  let trendData = {
-    trend: "Đang tính",
-    percent: "--",
-    avg24h: "--",
-    icon: "→",
-  };
-
-  function buildMarkerPopup(st, color, info, trendData) {
-    const trendColor =
-      trendData.trend === "Tăng"
-        ? "#dc2626"
-        : trendData.trend === "Giảm"
-          ? "#16a34a"
-          : "#2563eb";
-
-    const trendPercent =
-      trendData.percent === undefined || trendData.percent === null
-        ? "--"
-        : trendData.percent;
-
-    const avg24h =
-      trendData.avg24h === undefined || trendData.avg24h === null
-        ? "--"
-        : trendData.avg24h;
-
-    return `
-<div style="
-  font-family:Inter;
-  min-width:250px;
-">
-  <div style="
-    font-size:18px;
-    font-weight:900;
-    margin-bottom:8px;
-    text-align:center;
-  ">
-    ${st.name}
-  </div>
-
-  <div style="
-    text-align:center;
-    margin-bottom:10px;
-  ">
-    <span style="
-      font-size:36px;
-      font-weight:900;
-      color:${color};
-    ">
-      AQI ${st.aqi}
-    </span>
-  </div>
-
-  <div style="
-    background:${color};
-    color:${st.aqi <= 100 ? "#111" : "#fff"};
-    padding:6px 12px;
-    border-radius:999px;
-    text-align:center;
-    font-weight:800;
-    margin-bottom:12px;
-  ">
-    ${info.level}
-  </div>
-
-  <div style="
-    background:#f8fafc;
-    border-radius:10px;
-    padding:10px;
-    margin-bottom:10px;
-    border-left:5px solid ${color};
-  ">
-    <div style="font-weight:700;margin-bottom:5px;">
-      Xu hướng AQI 24h
-    </div>
-
+  marker.bindPopup(
+    `
     <div style="
-      font-size:20px;
-      font-weight:900;
-      color:${trendColor};
+      font-family:Inter;
+      min-width:250px;
     ">
-      ${trendData.icon || "→"} ${trendData.trend || "Không xác định"}
-    </div>
 
-    <div style="margin-top:5px;">
-      Biến động:
-      <b>${trendPercent}%</b>
-    </div>
-
-    <div style="margin-top:5px;">
-      AQI TB 24h:
-      <b>${avg24h}</b>
-    </div>
-  </div>
-
-  <div style="
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:8px;
-    margin-bottom:10px;
-  ">
-    <div style="
-      background:#f8fafc;
-      padding:8px;
-      border-radius:8px;
-      text-align:center;
-    ">
-      <div style="font-size:12px;color:#64748b">
-        PM2.5
+      <div style="
+        font-size:18px;
+        font-weight:900;
+        margin-bottom:8px;
+        text-align:center;
+      ">
+        ${st.name}
       </div>
-      <div style="font-weight:800">
-        ${st.pm25 ?? "--"} µg/m³
+
+      <div style="
+        text-align:center;
+        margin-bottom:10px;
+      ">
+        <span style="
+          font-size:36px;
+          font-weight:900;
+          color:${color};
+        ">
+          AQI ${st.aqi}
+        </span>
       </div>
+
+      <div style="
+        background:${color};
+        color:${st.aqi <= 100 ? "#111" : "#fff"};
+        padding:6px 12px;
+        border-radius:999px;
+        text-align:center;
+        font-weight:800;
+        margin-bottom:12px;
+      ">
+        ${info.level}
+      </div>
+
+      <div style="
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:8px;
+        margin-bottom:10px;
+      ">
+
+        <div style="
+          background:#f8fafc;
+          padding:8px;
+          border-radius:8px;
+          text-align:center;
+        ">
+          <div style="
+            font-size:12px;
+            color:#64748b;
+          ">
+            PM2.5
+          </div>
+
+          <div style="font-weight:800">
+            ${st.pm25 ?? "--"} µg/m³
+          </div>
+        </div>
+
+        <div style="
+          background:#f8fafc;
+          padding:8px;
+          border-radius:8px;
+          text-align:center;
+        ">
+          <div style="
+            font-size:12px;
+            color:#64748b;
+          ">
+            PM10
+          </div>
+
+          <div style="font-weight:800">
+            ${st.pm10 ?? "--"} µg/m³
+          </div>
+        </div>
+
+        <div style="
+          background:#f8fafc;
+          padding:8px;
+          border-radius:8px;
+          text-align:center;
+        ">
+          <div style="
+            font-size:12px;
+            color:#64748b;
+          ">
+            NO₂
+          </div>
+
+          <div style="font-weight:800">
+            ${st.no2 ?? "--"} µg/m³
+          </div>
+        </div>
+
+        <div style="
+          background:#f8fafc;
+          padding:8px;
+          border-radius:8px;
+          text-align:center;
+        ">
+          <div style="
+            font-size:12px;
+            color:#64748b;
+          ">
+            SO₂
+          </div>
+
+          <div style="font-weight:800">
+            ${st.so2 ?? "--"} µg/m³
+          </div>
+        </div>
+
+      </div>
+
+      <div style="
+        font-size:13px;
+        color:#374151;
+        line-height:1.5;
+        font-style:italic;
+      ">
+        "${info.advice}"
+      </div>
+
+      <div style="
+        margin-top:10px;
+        font-size:11px;
+        color:#64748b;
+        text-align:center;
+      ">
+        Cập nhật: ${getStationTime(st)}
+      </div>
+
     </div>
+  `,
+    {
+      maxWidth: 320,
+      closeButton: true,
+    },
+  );
 
-    <div style="
-      background:#f8fafc;
-      padding:8px;
-      border-radius:8px;
-      text-align:center;
-    ">
-      <div style="font-size:12px;color:#64748b">
-        PM10
-      </div>
-      <div style="font-weight:800">
-        ${st.pm10 ?? "--"} µg/m³
-      </div>
-    </div>
-  </div>
-
-  <div style="
-    font-size:13px;
-    color:#374151;
-    line-height:1.5;
-    font-style:italic;
-  ">
-    "${info.advice}"
-  </div>
-</div>
-`;
-  }
-
-  marker.bindPopup(buildMarkerPopup(st, color, info, trendData), {
-    maxWidth: 320,
-    closeButton: true,
+  marker.on("click", () => {
+    selectStation(st, {
+      fly: false,
+      openPopup: false,
+    });
   });
 
-  getAQITrend(st.name)
-    .then((realTrend) => {
-      trendData = realTrend;
-      marker.setPopupContent(buildMarkerPopup(st, color, info, trendData));
-    })
-    .catch((err) => {
-      console.error("Lỗi trend:", err);
-      trendData = {
-        trend: "Không xác định",
-        percent: "--",
-        avg24h: "--",
-        icon: "→",
-      };
-      marker.setPopupContent(buildMarkerPopup(st, color, info, trendData));
-    });
+  marker.on("mouseover", () => {
+    marker.setZIndexOffset(2000);
+  });
 
-  marker.on("click", () => selectStation(st, { fly: false, openPopup: false }));
-  marker.on("mouseover", () => marker.setZIndexOffset(2000));
-  marker.on("mouseout", () => marker.setZIndexOffset(1000));
+  marker.on("mouseout", () => {
+    marker.setZIndexOffset(1000);
+  });
 
   return marker;
 }
