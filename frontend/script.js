@@ -205,7 +205,173 @@ function getAQIInfo(aqi) {
     advice: "Báo động đỏ. Tránh ra ngoài nếu không thật sự cần thiết.",
   };
 }
+function getFeatureName(feature) {
+  const p = feature.properties || {};
+  return (
+    p.NAME_3 ||
+    p.NAME_2 ||
+    p.NAME_1 ||
+    p.name ||
+    p.NAME ||
+    "Khu vực không xác định"
+  );
+}
 
+function calculateIDWAQI(lat, lon) {
+  const validStations = allStations.filter((st) => {
+    return (
+      st.aqi &&
+      Number.isFinite(parseFloat(st.lat)) &&
+      Number.isFinite(parseFloat(st.lon))
+    );
+  });
+
+  if (validStations.length === 0) return null;
+
+  let numerator = 0;
+  let denominator = 0;
+  let nearestStation = null;
+  let nearestDistance = Infinity;
+
+  validStations.forEach((st) => {
+    const stLat = parseFloat(st.lat);
+    const stLon = parseFloat(st.lon);
+    const aqi = parseFloat(st.aqi);
+
+    let distance = calculateDistance(lat, lon, stLat, stLon);
+
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestStation = st;
+    }
+
+    // Nếu tâm vùng gần sát trạm thì lấy luôn AQI trạm đó
+    if (distance < 0.1) distance = 0.1;
+
+    const weight = 1 / Math.pow(distance, 2);
+
+    numerator += aqi * weight;
+    denominator += weight;
+  });
+
+  const estimatedAQI = Math.round(numerator / denominator);
+
+  return {
+    aqi: estimatedAQI,
+    nearestStation,
+    nearestDistance,
+  };
+}
+
+function getFeatureCenter(feature) {
+  try {
+    const center = turf.center(feature);
+    return {
+      lat: center.geometry.coordinates[1],
+      lon: center.geometry.coordinates[0],
+    };
+  } catch (err) {
+    const bounds = L.geoJSON(feature).getBounds();
+    const center = bounds.getCenter();
+    return {
+      lat: center.lat,
+      lon: center.lng,
+    };
+  }
+}
+
+function styleGADMByAQI(feature, level = 2) {
+  const center = getFeatureCenter(feature);
+  const result = calculateIDWAQI(center.lat, center.lon);
+
+  const aqi = result?.aqi ?? null;
+  const color = getAQIColor(aqi);
+
+  feature.properties.estimated_aqi = aqi;
+  feature.properties.nearest_station = result?.nearestStation?.name || "--";
+  feature.properties.nearest_distance = result?.nearestDistance || null;
+
+  return {
+    pane: "boundaryPane",
+    color: level === 1 ? "#1e3a8a" : level === 2 ? "#334155" : "#64748b",
+    weight: level === 1 ? 2.5 : level === 2 ? 1.4 : 0.8,
+    opacity: 0.9,
+    fillColor: color,
+    fillOpacity: level === 1 ? 0.18 : level === 2 ? 0.32 : 0.22,
+    interactive: true,
+  };
+}
+
+function onEachGADMFeature(feature, layer) {
+  const name = getFeatureName(feature);
+  const aqi = feature.properties.estimated_aqi;
+  const info = getAQIInfo(aqi);
+  const color = getAQIColor(aqi);
+  const nearest = feature.properties.nearest_station;
+  const distance = feature.properties.nearest_distance;
+
+  layer.bindPopup(`
+    <div style="font-family:Inter,system-ui;min-width:260px;">
+      <div style="font-size:17px;font-weight:900;text-align:center;margin-bottom:8px;">
+        ${name}
+      </div>
+
+      <div style="text-align:center;margin-bottom:10px;">
+        <div style="font-size:30px;font-weight:900;color:${color};">
+          AQI ${aqi ?? "--"}
+        </div>
+        <div style="
+          display:inline-block;
+          background:${color};
+          color:${aqi <= 100 ? "#111" : "#fff"};
+          padding:4px 10px;
+          border-radius:999px;
+          font-weight:800;
+          font-size:12px;
+        ">
+          ${info.level}
+        </div>
+      </div>
+
+      <div style="background:#f8fafc;border-radius:10px;padding:10px;margin-bottom:8px;">
+        <b>Phương pháp:</b> IDW - nội suy khoảng cách nghịch đảo<br>
+        <b>Dữ liệu:</b> AQI hiện tại từ các trạm quan trắc
+      </div>
+
+      <div style="font-size:13px;color:#334155;line-height:1.5;">
+        <b>Trạm gần nhất:</b> ${nearest}<br>
+        <b>Khoảng cách:</b> ${
+          distance ? distance.toFixed(2) + " km" : "--"
+        }<br>
+        <b>Ghi chú:</b> Giá trị AQI là ước lượng không gian, không phải số đo trực tiếp tại toàn bộ khu vực.
+      </div>
+    </div>
+  `);
+
+  layer.on({
+    mouseover: function () {
+      layer.setStyle({
+        weight: 3,
+        color: "#2563eb",
+        fillOpacity: 0.48,
+      });
+      layer.bringToFront();
+    },
+    mouseout: function () {
+      const parentLayer =
+        gadm3_Layer.hasLayer(layer)
+          ? gadm3_Layer
+          : gadm2_Layer.hasLayer(layer)
+          ? gadm2_Layer
+          : gadm1_Layer;
+
+      parentLayer.resetStyle(layer);
+    },
+    click: function () {
+      layer.openPopup();
+    },
+  });
+}
 function injectImprovedCSS() {
   const style = document.createElement("style");
   style.textContent = `
@@ -647,7 +813,7 @@ function selectSearchLocation(lat, lon, displayName) {
   searchMarker
     .bindPopup(
       `<div style="font-family:Inter,system-ui;min-width:240px;">
-      <b style="font-size:15px;">📍 ${escapeHtml(displayName)}</b>
+      <b style="font-size:15px;">${escapeHtml(displayName)}</b>
       <div style="margin-top:5px;font-size:12px;color:#64748b;">${lat.toFixed(4)}, ${lon.toFixed(4)}</div>
       ${nearestHtml}
     </div>`,
@@ -1154,32 +1320,123 @@ async function loadGADMData() {
     const g2 = await res2.json();
     const g3 = await res3.json();
 
-    gadm1_Layer.clearLayers().addData(g1).setStyle({
+    gadm1_Layer.clearLayers();
+    gadm2_Layer.clearLayers();
+    gadm3_Layer.clearLayers();
+
+    gadm1_Layer = L.geoJson(g1, {
       pane: "boundaryPane",
-      color: "#2563eb",
-      weight: 3,
-      opacity: 0.9,
-      fillOpacity: 0,
-      interactive: false,
+      style: (feature) => styleGADMByAQI(feature, 1),
+      onEachFeature: onEachGADMFeature,
     });
 
-    gadm2_Layer.clearLayers().addData(g2).setStyle({
+    gadm2_Layer = L.geoJson(g2, {
       pane: "boundaryPane",
-      color: "#0f172a",
-      weight: 1.4,
-      opacity: 0.65,
-      fillOpacity: 0,
-      interactive: false,
+      style: (feature) => styleGADMByAQI(feature, 2),
+      onEachFeature: onEachGADMFeature,
     });
 
-    gadm3_Layer.clearLayers().addData(g3).setStyle({
+    gadm3_Layer = L.geoJson(g3, {
       pane: "boundaryPane",
-      color: "#64748b",
-      weight: 0.7,
-      opacity: 0.45,
-      fillOpacity: 0,
-      interactive: false,
+      style: (feature) => styleGADMByAQI(feature, 3),
+      onEachFeature: onEachGADMFeature,
     });
+
+    // Mặc định chỉ bật cấp 2 cho dễ nhìn
+    if (map.hasLayer(gadm1_Layer)) map.removeLayer(gadm1_Layer);
+    if (map.hasLayer(gadm3_Layer)) map.removeLayer(gadm3_Layer);
+
+    gadm2_Layer.addTo(map);
+
+    // Cập nhật lại layer control để nhận layer mới
+    if (layerControl) {
+      map.removeControl(layerControl);
+    }
+
+    const baseMaps = {
+      "Bản đồ nền": osmTile,
+    };
+
+    const overlayMaps = {
+      "Trạm quan trắc AQI": markersLayer,
+      "Bản đồ nhiệt AQI": heatmapLayer,
+      "Cấp 1: Thành phố": gadm1_Layer,
+      "Cấp 2: Quận/Huyện - AQI ước lượng": gadm2_Layer,
+      "Cấp 3: Phường/Xã - AQI ước lượng": gadm3_Layer,
+      "GeoServer AQI": geoserverLayer,
+    };
+
+    layerControl = L.control.layers(baseMaps, overlayMaps, {
+      collapsed: false,
+      position: "topright",
+    }).addTo(map);
+
+    drawHeatmap();
+  } catch (err) {
+    console.error("Lỗi load GADM:", err);
+  }
+}async function loadGADMData() {
+  try {
+    const [res1, res2, res3] = await Promise.all([
+      fetch("geodata/Hanoi_gadm_1.geojson"),
+      fetch("geodata/Hanoi_gadm_2.geojson"),
+      fetch("geodata/Hanoi_gadm_3.geojson"),
+    ]);
+
+    const g1 = await res1.json();
+    const g2 = await res2.json();
+    const g3 = await res3.json();
+
+    gadm1_Layer.clearLayers();
+    gadm2_Layer.clearLayers();
+    gadm3_Layer.clearLayers();
+
+    gadm1_Layer = L.geoJson(g1, {
+      pane: "boundaryPane",
+      style: (feature) => styleGADMByAQI(feature, 1),
+      onEachFeature: onEachGADMFeature,
+    });
+
+    gadm2_Layer = L.geoJson(g2, {
+      pane: "boundaryPane",
+      style: (feature) => styleGADMByAQI(feature, 2),
+      onEachFeature: onEachGADMFeature,
+    });
+
+    gadm3_Layer = L.geoJson(g3, {
+      pane: "boundaryPane",
+      style: (feature) => styleGADMByAQI(feature, 3),
+      onEachFeature: onEachGADMFeature,
+    });
+
+    // Mặc định chỉ bật cấp 2 cho dễ nhìn
+    if (map.hasLayer(gadm1_Layer)) map.removeLayer(gadm1_Layer);
+    if (map.hasLayer(gadm3_Layer)) map.removeLayer(gadm3_Layer);
+
+    gadm2_Layer.addTo(map);
+
+    // Cập nhật lại layer control để nhận layer mới
+    if (layerControl) {
+      map.removeControl(layerControl);
+    }
+
+    const baseMaps = {
+      "Bản đồ nền": osmTile,
+    };
+
+    const overlayMaps = {
+      "Trạm quan trắc AQI": markersLayer,
+      "Bản đồ nhiệt AQI": heatmapLayer,
+      "Cấp 1: Thành phố": gadm1_Layer,
+      "Cấp 2: Quận/Huyện - AQI ước lượng": gadm2_Layer,
+      "Cấp 3: Phường/Xã - AQI ước lượng": gadm3_Layer,
+      "GeoServer AQI": geoserverLayer,
+    };
+
+    layerControl = L.control.layers(baseMaps, overlayMaps, {
+      collapsed: false,
+      position: "topright",
+    }).addTo(map);
 
     drawHeatmap();
   } catch (err) {
