@@ -1208,9 +1208,50 @@ async function loadStations() {
     const stations = await res.json();
 
     allStations = Array.isArray(stations)
-      ? stations.filter(
-          (st) => toNumber(st.aqi) !== null && toNumber(st.aqi) >= 5,
-        )
+      ? stations.filter((st) => {
+          const aqi = toNumber(st.aqi);
+
+          // Không có AQI
+          if (aqi === null) return false;
+
+          // API trả "-"
+          if (st.aqi === "-" || st.aqi === "--") return false;
+
+          // AQI bất thường
+          if (aqi > 500) return false;
+
+          // AQI quá thấp bất thường
+          if (aqi < 5) return false;
+
+          // Lấy thời gian cập nhật
+          const timeRaw =
+            st.time?.s ||
+            st.time ||
+            st.updated_at ||
+            st.updatedAt ||
+            st.created_at ||
+            st.createdAt ||
+            st.date ||
+            null;
+
+          // Nếu có thời gian thì kiểm tra
+          if (timeRaw) {
+            const lastTime = new Date(timeRaw);
+
+            if (!Number.isNaN(lastTime.getTime())) {
+              const now = new Date();
+
+              const diffHours = (now - lastTime) / (1000 * 60 * 60);
+
+              // Dữ liệu cũ quá 24h → ẩn
+              if (diffHours > 24) {
+                return false;
+              }
+            }
+          }
+
+          return true;
+        })
       : [];
 
     list.innerHTML = "";
