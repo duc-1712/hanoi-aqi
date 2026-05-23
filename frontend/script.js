@@ -297,7 +297,7 @@ function styleGADMByAQI(feature, level = 2) {
     weight: level === 1 ? 2.5 : level === 2 ? 1.4 : 0.8,
     opacity: 0.9,
     fillColor: color,
-    fillOpacity: level === 1 ? 0.18 : level === 2 ? 0.32 : 0.22,
+    fillOpacity: level === 1 ? 0.08 : level === 2 ? 0.18 : 0.12,
     interactive: true,
   };
 }
@@ -368,6 +368,42 @@ function onEachGADMFeature(feature, layer) {
       layer.openPopup();
     },
   });
+  addGADMLabel(feature, layer);
+}
+function addGADMLabel(feature, layer) {
+  const aqi = feature.properties.estimated_aqi;
+  if (!aqi) return;
+
+  const center = getFeatureCenter(feature);
+  const color = getAQIColor(aqi);
+  const textColor = getAQITextColor(aqi);
+
+  const label = L.marker([center.lat, center.lon], {
+    pane: "markerPane",
+    interactive: false,
+    icon: L.divIcon({
+      className: "gadm-aqi-label",
+      html: `
+        <div style="
+          background:${color};
+          color:${textColor};
+          border:2px solid white;
+          box-shadow:0 2px 8px rgba(0,0,0,.25);
+          border-radius:999px;
+          padding:3px 8px;
+          font-size:12px;
+          font-weight:900;
+          white-space:nowrap;
+        ">
+          AQI ${aqi}
+        </div>
+      `,
+      iconSize: [60, 24],
+      iconAnchor: [30, 12],
+    }),
+  });
+
+  layer._aqiLabel = label;
 }
 function injectImprovedCSS() {
   const style = document.createElement("style");
@@ -1376,7 +1412,9 @@ async function loadGADMData() {
     if (map.hasLayer(gadm3_Layer)) map.removeLayer(gadm3_Layer);
 
     gadm2_Layer.addTo(map);
-
+    gadm2_Layer.eachLayer((layer) => {
+      if (layer._aqiLabel) layer._aqiLabel.addTo(map);
+    });
     // Cập nhật lại layer control để nhận layer mới
     if (layerControl) {
       map.removeControl(layerControl);
@@ -1401,7 +1439,29 @@ async function loadGADMData() {
         position: "topright",
       })
       .addTo(map);
+    map.on("overlayadd", function (e) {
+      if (
+        e.layer === gadm1_Layer ||
+        e.layer === gadm2_Layer ||
+        e.layer === gadm3_Layer
+      ) {
+        e.layer.eachLayer((layer) => {
+          if (layer._aqiLabel) layer._aqiLabel.addTo(map);
+        });
+      }
+    });
 
+    map.on("overlayremove", function (e) {
+      if (
+        e.layer === gadm1_Layer ||
+        e.layer === gadm2_Layer ||
+        e.layer === gadm3_Layer
+      ) {
+        e.layer.eachLayer((layer) => {
+          if (layer._aqiLabel) map.removeLayer(layer._aqiLabel);
+        });
+      }
+    });
     drawHeatmap();
   } catch (err) {
     console.error("Lỗi load GADM:", err);
