@@ -370,17 +370,20 @@ function onEachGADMFeature(feature, layer) {
   });
   addGADMLabel(feature, layer);
 }
-function addGADMLabel(feature, layer) {
+function addGADMLabel(feature, parentLayer) {
   const aqi = feature.properties.estimated_aqi;
+
   if (!aqi) return;
 
   const center = getFeatureCenter(feature);
+
   const color = getAQIColor(aqi);
   const textColor = getAQITextColor(aqi);
 
   const label = L.marker([center.lat, center.lon], {
-    pane: "markerPane",
     interactive: false,
+    zIndexOffset: 9999,
+
     icon: L.divIcon({
       className: "gadm-aqi-label",
       html: `
@@ -388,22 +391,26 @@ function addGADMLabel(feature, layer) {
           background:${color};
           color:${textColor};
           border:2px solid white;
-          box-shadow:0 2px 8px rgba(0,0,0,.25);
           border-radius:999px;
-          padding:3px 8px;
-          font-size:12px;
+          padding:4px 10px;
+          font-size:13px;
           font-weight:900;
+          box-shadow:0 2px 8px rgba(0,0,0,.25);
           white-space:nowrap;
         ">
-          AQI ${aqi}
+          ${aqi}
         </div>
       `,
-      iconSize: [60, 24],
-      iconAnchor: [30, 12],
+      iconSize: [60, 28],
+      iconAnchor: [30, 14],
     }),
   });
 
-  layer._aqiLabel = label;
+  parentLayer._aqiLabel = label;
+
+  if (map.hasLayer(gadm2_Layer) || map.hasLayer(gadm3_Layer)) {
+    label.addTo(map);
+  }
 }
 function injectImprovedCSS() {
   const style = document.createElement("style");
@@ -1446,7 +1453,9 @@ async function loadGADMData() {
         e.layer === gadm3_Layer
       ) {
         e.layer.eachLayer((layer) => {
-          if (layer._aqiLabel) layer._aqiLabel.addTo(map);
+          if (layer._aqiLabel) {
+            layer._aqiLabel.addTo(map);
+          }
         });
       }
     });
@@ -1458,7 +1467,9 @@ async function loadGADMData() {
         e.layer === gadm3_Layer
       ) {
         e.layer.eachLayer((layer) => {
-          if (layer._aqiLabel) map.removeLayer(layer._aqiLabel);
+          if (layer._aqiLabel) {
+            map.removeLayer(layer._aqiLabel);
+          }
         });
       }
     });
