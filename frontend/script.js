@@ -1,10 +1,7 @@
-// =======================================================
-// HANOI AQI WEBGIS - IMPROVED script.js
-// =======================================================
-
 const API_URL = "/api/stations";
 const HISTORY_API_URL = "/api/history";
 const NOMINATIM_API = "https://nominatim.openstreetmap.org/search";
+const TREND_API_URL = "/api/trend";
 
 let allStations = [];
 let stationMarkers = new Map();
@@ -79,7 +76,7 @@ function initLayerControl() {
     "Cấp 1: Thành phố": gadm1_Layer,
     "Cấp 2: Quận/Huyện": gadm2_Layer,
     "Cấp 3: Phường/Xã": gadm3_Layer,
-    "GeoServer AQI": geoserverLayer,
+    // "GeoServer AQI": geoserverLayer,
   };
 
   if (layerControl) map.removeControl(layerControl);
@@ -816,10 +813,134 @@ function createAQIMarker(st) {
     zIndexOffset: 1000,
   }).addTo(markersLayer);
 
-  marker.bindPopup(buildStationPopup(st), {
-    maxWidth: 320,
-    closeButton: true,
-  });
+  const marker = createAQIMarker(st);
+
+const trendData = await getAQITrend(st.name);
+
+marker.bindPopup(`
+<div style="
+  font-family:Inter;
+  min-width:250px;
+">
+  
+  <div style="
+    font-size:18px;
+    font-weight:900;
+    margin-bottom:8px;
+    text-align:center;
+  ">
+    ${st.name}
+  </div>
+
+  <div style="
+    text-align:center;
+    margin-bottom:10px;
+  ">
+    <span style="
+      font-size:36px;
+      font-weight:900;
+      color:${color};
+    ">
+      AQI ${st.aqi}
+    </span>
+  </div>
+
+  <div style="
+    background:${color};
+    color:white;
+    padding:6px 12px;
+    border-radius:999px;
+    text-align:center;
+    font-weight:800;
+    margin-bottom:12px;
+  ">
+    ${info.level}
+  </div>
+
+  <div style="
+    background:#f8fafc;
+    border-radius:10px;
+    padding:10px;
+    margin-bottom:10px;
+    border-left:5px solid ${color};
+  ">
+    <div style="font-weight:700;margin-bottom:5px;">
+      Xu hướng AQI 24h
+    </div>
+
+    <div style="
+      font-size:20px;
+      font-weight:900;
+      color:${
+        trendData.trend === "Tăng"
+          ? "#dc2626"
+          : trendData.trend === "Giảm"
+          ? "#16a34a"
+          : "#2563eb"
+      };
+    ">
+      ${trendData.icon} ${trendData.trend}
+    </div>
+
+    <div style="margin-top:5px;">
+      Biến động:
+      <b>${trendData.percent}%</b>
+    </div>
+
+    <div style="margin-top:5px;">
+      AQI TB 24h:
+      <b>${trendData.avg24h ?? "--"}</b>
+    </div>
+  </div>
+
+  <div style="
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-bottom:10px;
+  ">
+    <div style="
+      background:#f8fafc;
+      padding:8px;
+      border-radius:8px;
+      text-align:center;
+    ">
+      <div style="font-size:12px;color:#64748b">
+        PM2.5
+      </div>
+      <div style="font-weight:800">
+        ${st.pm25 ?? "--"}
+      </div>
+    </div>
+
+    <div style="
+      background:#f8fafc;
+      padding:8px;
+      border-radius:8px;
+      text-align:center;
+    ">
+      <div style="font-size:12px;color:#64748b">
+        PM10
+      </div>
+      <div style="font-weight:800">
+        ${st.pm10 ?? "--"}
+      </div>
+    </div>
+  </div>
+
+  <div style="
+    font-size:13px;
+    color:#374151;
+    line-height:1.5;
+    font-style:italic;
+  ">
+    "${info.advice}"
+  </div>
+</div>
+`, {
+  maxWidth: 320,
+  closeButton: true,
+});
 
   marker.on("click", () => selectStation(st, { fly: false, openPopup: false }));
   marker.on("mouseover", () => marker.setZIndexOffset(2000));
