@@ -1519,32 +1519,48 @@ async function loadGADMData() {
     console.error("Lỗi load GADM:", err);
   }
 }
-
 function drawHeatmap() {
   if (!allStations || allStations.length < 2) return;
 
   heatmapLayer.clearLayers();
 
-  const heatPoints = allStations
-    .filter((st) => toNumber(st.aqi) !== null && toNumber(st.aqi) >= 5)
-    .map((st) => [
-      parseFloat(st.lat),
-      parseFloat(st.lon),
-      Math.min(toNumber(st.aqi) / 300, 1),
-    ]);
+  const validStations = allStations.filter((st) => {
+    const aqi = toNumber(st.aqi);
+
+    return (
+      aqi !== null &&
+      aqi >= 5 &&
+      aqi <= 500 &&
+      Number.isFinite(parseFloat(st.lat)) &&
+      Number.isFinite(parseFloat(st.lon))
+    );
+  });
+
+  if (validStations.length < 2) return;
+
+  const heatPoints = validStations.map((st) => {
+    const aqi = toNumber(st.aqi);
+
+    let intensity = aqi / 200;
+
+    if (intensity < 0.25) intensity = 0.25;
+    if (intensity > 1) intensity = 1;
+
+    return [parseFloat(st.lat), parseFloat(st.lon), intensity];
+  });
 
   if (typeof L.heatLayer === "function") {
     const heat = L.heatLayer(heatPoints, {
       pane: "heatmapPane",
-      radius: 48,
-      blur: 34,
+      radius: 70,
+      blur: 28,
       maxZoom: 14,
-      minOpacity: 0.25,
+      minOpacity: 0.45,
       gradient: {
-        0.1: "#00e400",
-        0.3: "#ffff00",
-        0.5: "#ff7e00",
-        0.7: "#ff0000",
+        0.15: "#00e400",
+        0.35: "#ffff00",
+        0.55: "#ff7e00",
+        0.75: "#ff0000",
         0.9: "#8f3f97",
         1.0: "#7e0023",
       },
@@ -1555,13 +1571,6 @@ function drawHeatmap() {
   }
 
   try {
-    const validStations = allStations.filter(
-      (st) =>
-        Number.isFinite(parseFloat(st.lat)) &&
-        Number.isFinite(parseFloat(st.lon)) &&
-        toNumber(st.aqi) !== null,
-    );
-
     const points = turf.featureCollection(
       validStations.map((st) =>
         turf.point([parseFloat(st.lon), parseFloat(st.lat)], {
@@ -1570,7 +1579,7 @@ function drawHeatmap() {
       ),
     );
 
-    const grid = turf.interpolate(points, 1.5, {
+    const grid = turf.interpolate(points, 1.2, {
       gridType: "points",
       property: "aqi",
       units: "kilometers",
@@ -1582,10 +1591,10 @@ function drawHeatmap() {
       pointToLayer: (feature, latlng) =>
         L.circleMarker(latlng, {
           pane: "heatmapPane",
-          radius: 42,
+          radius: 55,
           fillColor: getAQIColor(feature.properties.aqi),
           color: "transparent",
-          fillOpacity: 0.16,
+          fillOpacity: 0.28,
           interactive: false,
         }),
     });
@@ -1595,7 +1604,6 @@ function drawHeatmap() {
     console.error("Lỗi vẽ heatmap fallback:", err);
   }
 }
-
 const searchInput = document.getElementById("location-search");
 const clearBtn = document.getElementById("clear-search");
 const resultsDiv = document.getElementById("search-results");
