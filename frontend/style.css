@@ -286,7 +286,21 @@ header h1 {
     right: 10px;
     z-index: 1000;
 }
+#btn-locate{
+  position:absolute;
+  top:90px;
+  right:20px;
+  z-index:9999;
 
+  background:#fff;
+  border:none;
+  padding:10px 14px;
+  border-radius:12px;
+  font-weight:700;
+  cursor:pointer;
+
+  box-shadow:0 2px 10px rgba(0,0,0,.15);
+}
 .gis-button {
     background: white;
     border: 2px solid #3b82f6;
