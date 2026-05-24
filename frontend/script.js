@@ -1809,38 +1809,83 @@ window.findNearest = function () {
       const lat = pos.coords.latitude;
       const lon = pos.coords.longitude;
 
-      let nearest = null;
-      let minDistance = Infinity;
+      if (userMarker) map.removeLayer(userMarker);
 
-      allStations.forEach((st) => {
-        const distance = calculateDistance(
-          lat,
-          lon,
-          parseFloat(st.lat),
-          parseFloat(st.lon),
-        );
+      const idwResult = calculateIDWAQI(lat, lon);
+      const estimatedAQI = idwResult?.aqi ?? null;
+      const nearest = idwResult?.nearestStation ?? null;
+      const distance = idwResult?.nearestDistance ?? null;
 
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearest = st;
-        }
-      });
+      const color = getAQIColor(estimatedAQI);
+      const info = getAQIInfo(estimatedAQI);
 
-      if (nearest) {
-        selectStation(nearest);
+      userMarker = L.marker([lat, lon], {
+        pane: "markerPane",
+        icon: L.divIcon({
+          className: "user-location-marker",
+          html: `
+            <div style="
+              background:${color};
+              color:${estimatedAQI <= 100 ? "#111" : "#fff"};
+              border:3px solid white;
+              border-radius:999px;
+              padding:6px 10px;
+              font-weight:900;
+              box-shadow:0 4px 14px rgba(0,0,0,.35);
+              white-space:nowrap;
+            ">
+              AQI ${estimatedAQI ?? "--"}
+            </div>
+          `,
+          iconSize: [70, 30],
+          iconAnchor: [35, 15],
+        }),
+      }).addTo(map);
 
-        const marker = stationMarkers?.get(nearest.name);
-        if (marker) marker.openPopup();
+      userMarker
+        .bindPopup(
+          `
+        <div style="font-family:Inter,system-ui;min-width:250px;">
+          <div style="font-size:17px;font-weight:900;text-align:center;margin-bottom:8px;">
+            Vị trí của tôi
+          </div>
 
-        alert(
-          `Trạm gần nhất: ${nearest.name}\nKhoảng cách: ${minDistance.toFixed(
-            2,
-          )} km\nAQI: ${nearest.aqi}`,
-        );
-      }
+          <div style="text-align:center;margin-bottom:10px;">
+            <div style="font-size:30px;font-weight:900;color:${color};">
+              AQI ${estimatedAQI ?? "--"}
+            </div>
+            <div style="
+              display:inline-block;
+              background:${color};
+              color:${estimatedAQI <= 100 ? "#111" : "#fff"};
+              padding:4px 10px;
+              border-radius:999px;
+              font-weight:800;
+              font-size:12px;
+            ">
+              ${info.level}
+            </div>
+          </div>
+
+          <div style="background:#f8fafc;border-radius:10px;padding:10px;font-size:13px;line-height:1.5;">
+            <b>Phương pháp:</b> AQI ước lượng bằng IDW<br>
+            <b>Trạm gần nhất:</b> ${nearest?.name ?? "--"}<br>
+            <b>Khoảng cách:</b> ${distance ? distance.toFixed(2) + " km" : "--"}<br>
+            <b>Ghi chú:</b> Đây là giá trị ước lượng theo không gian, không phải số đo trực tiếp.
+          </div>
+        </div>
+      `,
+        )
+        .openPopup();
+
+      map.flyTo([lat, lon], 15, { duration: 1.2 });
     },
     () => {
-      alert("Không lấy được vị trí. Hãy cấp quyền định vị cho trình duyệt.");
+      alert("Không lấy được vị trí. Hãy cấp quyền Location cho trình duyệt.");
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
     },
   );
 };
