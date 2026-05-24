@@ -76,7 +76,6 @@ function initLayerControl() {
     "Cấp 1: Thành phố": gadm1_Layer,
     "Cấp 2: Quận/Huyện": gadm2_Layer,
     "Cấp 3: Phường/Xã": gadm3_Layer,
-    // "GeoServer AQI": geoserverLayer,
   };
 
   if (layerControl) map.removeControl(layerControl);
@@ -1129,7 +1128,7 @@ function createAQIMarker(st) {
           border-left:5px solid ${trendColor};
         ">
           <div style="font-weight:800;margin-bottom:5px;">
-            Xu hướng AQI 24h
+            AQI hiện tại so với trung bình 24h trước:
           </div>
 
           <div style="
@@ -1554,7 +1553,6 @@ async function loadGADMData() {
       "Cấp 1: Thành phố": gadm1_Layer,
       "Cấp 2: Quận/Huyện - AQI ước lượng": gadm2_Layer,
       "Cấp 3: Phường/Xã - AQI ước lượng": gadm3_Layer,
-      "GeoServer AQI": geoserverLayer,
     };
 
     layerControl = L.control
