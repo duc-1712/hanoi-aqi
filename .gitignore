@@ -2,7 +2,7 @@
 
 # Bỏ qua tệp Môi trường (Chứa mật khẩu, API key)
 .env
-
+#
 # Bỏ qua các thư mục chứa thư viện đã cài đặt
 node_modules/
 backend/node_modules/
